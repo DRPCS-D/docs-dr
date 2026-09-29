@@ -54,6 +54,7 @@ Las funciones están agrupadas en pestañas: **Inicio** (abrir, guardar, imprimi
 - **PDF buscable (OCR)** (Herramientas › Hacer PDF buscable…): reconoce el texto de las páginas escaneadas y lo agrega como capa invisible; la página se ve igual pero se puede buscar y copiar. Los datos de idioma vienen incluidos en el instalador (desde el código fuente: `scripts/get-tessdata.ps1`).
 - **Exportar páginas como imágenes** (Archivo, pestaña Páginas): PNG o JPEG a 72–300 ppp, todas las páginas, las elegidas o un rango. Nunca pisa archivos existentes.
 - **Crear PDF desde imágenes** (Archivo, pestaña Páginas): una imagen por página, en el orden que elijas; hoja A4 vertical u horizontal según la imagen.
+- **Reducir tamaño del archivo** (Archivo › Reducir tamaño del archivo…, o pestaña Convertir): crea una copia más liviana sin tocar el documento abierto. Tres niveles: sin pérdida (limpia y comprime), equilibrada (imágenes a 150 ppp) y máxima (96 ppp). Muestra el tamaño antes y después; si no se logra reducir, no guarda nada.
 - **Recordar la vista**: al cerrar se guardan la posición y el tamaño de la ventana y los documentos abiertos (con página y zoom); se reabren al iniciar. Se desactiva en Ver › Reabrir documentos al iniciar.
 
 ## Edición del contenido (fase 4, pestaña *Edición*)

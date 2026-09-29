@@ -118,6 +118,14 @@ public sealed record TextBlockInfo(int PageIndex, PdfRect Box, IReadOnlyList<Tex
 /// <summary>Imagen colocada en una página. <see cref="Xref"/> es el objeto de imagen (puede repetirse en varias posiciones).</summary>
 public sealed record PageImageInfo(int PageIndex, int Xref, PdfRect Box);
 
+/// <summary>Cuánto se comprime: sin pérdida (solo limpieza y compresión), media (imágenes a 150 ppp) o fuerte (imágenes a 96 ppp).</summary>
+public enum OptimizeLevel { Lossless, Medium, Strong }
+
+public sealed record OptimizeResult(long OriginalBytes, long NewBytes)
+{
+    public double SavedFraction => OriginalBytes <= 0 ? 0 : 1.0 - (double)NewBytes / OriginalBytes;
+}
+
 /// <summary>
 /// Operaciones de modificación de un PDF. Todas las páginas se indican con índice base 0.
 /// La app protege cada operación con una instantánea (<see cref="CreateSnapshot"/>) para poder deshacer.
@@ -197,6 +205,14 @@ public interface IPdfEditor
 
     /// <summary>Escribe las palabras reconocidas como texto invisible sobre la imagen: la página se ve igual pero se puede buscar y copiar.</summary>
     void AddInvisibleText(int page, IReadOnlyList<TextWord> words);
+
+    // ---- Reducir el tamaño del archivo ----
+
+    /// <summary>
+    /// Escribe en <paramref name="destPath"/> una copia optimizada del documento (con sus cambios actuales). El documento
+    /// abierto no cambia. Devuelve el tamaño de referencia (el archivo en disco, o el documento en memoria si no existe) y el nuevo.
+    /// </summary>
+    OptimizeResult OptimizeTo(string destPath, OptimizeLevel level);
 
     // ---- Deshacer y guardar ----
     byte[] CreateSnapshot();

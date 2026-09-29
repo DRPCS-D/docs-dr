@@ -213,6 +213,64 @@ public class ToolsTests : IDisposable
         doc.Dispose();
     }
 
+    // ---------------- Reducir tamaño ----------------
+
+    /// <summary>PDF con texto y una imagen grande tipo foto (degradado + ruido), a ~290 ppp sobre la página.</summary>
+    private static string CreateHeavyPdf()
+    {
+        byte[] png;
+        lock (MuPdfDocument.NativeLock)
+        {
+            const int w = 1600, h = 1200;
+            var raw = new byte[w * h * 3];
+            var rnd = new Random(7);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    int i = (y * w + x) * 3;
+                    raw[i] = (byte)Math.Clamp(x * 255 / w + rnd.Next(-25, 25), 0, 255);
+                    raw[i + 1] = (byte)Math.Clamp(y * 255 / h + rnd.Next(-25, 25), 0, 255);
+                    raw[i + 2] = (byte)Math.Clamp(128 + rnd.Next(-40, 40), 0, 255);
+                }
+            png = new Pixmap(new Colorspace(Utils.CS_RGB), w, h, raw, false).ToBytes("png");
+        }
+        return Create(p =>
+        {
+            p.InsertText(new Point(40, 40), "Texto que debe sobrevivir", fontSize: 14, fontName: "helv");
+            p.InsertImage(new MuPDF.NET.Rect(20, 60, 380, 330), stream: png, keepProportion: false);
+        });
+    }
+
+    [Fact]
+    public void Optimizing_shrinks_the_file_by_level_without_touching_the_open_document()
+    {
+        var path = CreateHeavyPdf();
+        var (doc, ed) = Open(path);
+        var dir = Path.GetDirectoryName(path)!;
+        string Out(string n) => Path.Combine(dir, $"{Guid.NewGuid():N}-{n}.pdf");
+        var lossless = ed.OptimizeTo(Out("l"), OptimizeLevel.Lossless);
+        var medium = ed.OptimizeTo(Out("m"), OptimizeLevel.Medium);
+        var strongPath = Out("s");
+        var strong = ed.OptimizeTo(strongPath, OptimizeLevel.Strong);
+
+        Assert.True(lossless.NewBytes <= lossless.OriginalBytes * 1.05, "sin pérdida no debe agrandar el archivo");
+        Assert.True(medium.NewBytes < medium.OriginalBytes * 0.5, $"media debería reducir a menos de la mitad ({medium.NewBytes} de {medium.OriginalBytes})");
+        Assert.True(strong.NewBytes < medium.NewBytes, "fuerte debe pesar menos que media");
+        Assert.InRange(strong.SavedFraction, 0.5, 1);
+
+        // El resultado sigue siendo un PDF válido con lo mismo dentro.
+        var result = new MuPdfService().Open(strongPath);
+        Assert.Equal(1, result.PageCount);
+        Assert.Contains(result.GetWords(0), w => w.Text == "sobrevivir");
+        Assert.Single(((IPdfEditor)result).GetImages(0));
+        result.Dispose();
+
+        // El documento abierto no cambió.
+        Assert.Contains(doc.GetWords(0), w => w.Text == "sobrevivir");
+        Assert.Equal(new System.IO.FileInfo(path).Length, medium.OriginalBytes);
+        doc.Dispose();
+    }
+
     [Fact]
     public void Ocr_reports_unavailable_data_instead_of_failing()
     {

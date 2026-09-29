@@ -60,6 +60,45 @@ public static partial class Dialogs
         window.ShowDialog();
     }
 
+    /// <summary>Tamaño legible: «850 KB», «12,4 MB».</summary>
+    public static string FormatSize(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{bytes / 1048576.0:0.#} MB" : $"{Math.Max(1, bytes / 1024.0):0} KB";
+
+    /// <summary>Elige cuánto reducir el archivo. Null si se cancela.</summary>
+    public static DocsDR.Core.OptimizeLevel? AskOptimizeLevel(long currentBytes)
+    {
+        RadioButton Option(string title, string detail, bool selected)
+        {
+            var text = new StackPanel();
+            text.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold });
+            text.Children.Add(new TextBlock { Text = detail, Opacity = 0.7, FontSize = 12, TextWrapping = TextWrapping.Wrap, Width = 380 });
+            return new RadioButton { Content = text, IsChecked = selected, GroupName = "o", Margin = new Thickness(0, 8, 0, 0) };
+        }
+
+        var lossless = Option("Sin pérdida", "Solo limpia y comprime el contenido. La calidad no cambia; el ahorro suele ser pequeño.", false);
+        var medium = Option("Equilibrada (recomendada)", "Reduce las imágenes a 150 ppp con calidad JPEG alta. Se ve igual en pantalla y al imprimir.", true);
+        var strong = Option("Máxima compresión", "Imágenes a 96 ppp. El archivo pesa lo mínimo; las fotos pierden algo de nitidez.", false);
+
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(new TextBlock { Text = $"Tamaño actual: {FormatSize(currentBytes)}", FontWeight = FontWeights.SemiBold });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Se crea un archivo nuevo; el documento abierto y el original no cambian.",
+            Opacity = 0.7, FontSize = 12, Margin = new Thickness(0, 2, 0, 4),
+        });
+        panel.Children.Add(lossless);
+        panel.Children.Add(medium);
+        panel.Children.Add(strong);
+        panel.Children.Add(Buttons(out var ok, "Reducir…"));
+
+        var window = Create("Reducir tamaño del archivo", panel);
+        ok.Click += (_, _) => window.DialogResult = true;
+        if (window.ShowDialog() != true) return null;
+        return lossless.IsChecked == true ? DocsDR.Core.OptimizeLevel.Lossless
+             : strong.IsChecked == true ? DocsDR.Core.OptimizeLevel.Strong
+             : DocsDR.Core.OptimizeLevel.Medium;
+    }
+
     public sealed record ExportImageOptions(bool Jpeg, int Dpi, List<int> Pages);
 
     /// <summary>Opciones para exportar páginas como imágenes. Null si se cancela.</summary>

@@ -49,6 +49,7 @@
                 <MenuItem Header="_Unir PDFs…" Command="{Binding MergePdfsCommand}" />
                 <MenuItem Header="Crear PDF desde _imágenes…" Command="{Binding ImagesToPdfCommand}" />
                 <MenuItem Header="_Exportar páginas como imágenes…" Command="{Binding SelectedDocument.ExportImagesCommand}" />
+                <MenuItem Header="_Reducir tamaño del archivo…" Command="{Binding SelectedDocument.ReduceSizeCommand}" />
                 <Separator />
                 <MenuItem Header="_Imprimir…" InputGestureText="Ctrl+P" Command="{Binding PrintCommand}" />
                 <MenuItem Header="_Cerrar documento" InputGestureText="Ctrl+W" Command="{Binding CloseDocumentCommand}" />
@@ -309,6 +310,8 @@
                     <ToolBar DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
                         <Button Style="{StaticResource ToolButton}" Command="{Binding MakeSearchableCommand}"
                                 ToolTip="Reconoce el texto de las páginas escaneadas para poder buscarlo y copiarlo" Content="🔍 PDF buscable (OCR)…" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ReduceSizeCommand}"
+                                ToolTip="Crea una copia del PDF más liviana (recomprime las imágenes)" Content="🗜 Reducir tamaño…" />
                     </ToolBar>
                 </ToolBarTray>
             </TabItem>

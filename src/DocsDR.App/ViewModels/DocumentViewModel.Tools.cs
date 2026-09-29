@@ -181,6 +181,58 @@ public sealed partial class DocumentViewModel
             SearchStatus = $"PDF buscable: {recognized.Count} página(s), {wordCount} palabras. Guarda el documento para conservarlo.";
     }
 
+    // ================= Reducir el tamaño del archivo =================
+
+    [RelayCommand(CanExecute = nameof(CanEdit))]
+    private async Task ReduceSizeAsync()
+    {
+        if (Editor is not { } ed) return;
+        long current = File.Exists(FilePath) ? new FileInfo(FilePath).Length : 0;
+        var level = Dialogs.AskOptimizeLevel(current);
+        if (level is null) return;
+
+        var dlg = new SaveFileDialog
+        {
+            Filter = "Documentos PDF (*.pdf)|*.pdf",
+            FileName = Path.GetFileNameWithoutExtension(Title) + "_reducido.pdf",
+            InitialDirectory = Path.GetDirectoryName(FilePath),
+            Title = "Guardar la copia reducida",
+        };
+        if (dlg.ShowDialog() != true) return;
+        if (string.Equals(Path.GetFullPath(dlg.FileName), Path.GetFullPath(FilePath), StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("Elige un nombre distinto al del documento abierto: la copia reducida se guarda aparte.", "Reducir tamaño",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        SearchStatus = "Reduciendo el tamaño del archivo…";
+        try
+        {
+            var result = await Task.Run(() => ed.OptimizeTo(dlg.FileName, level.Value));
+            if (result.NewBytes >= result.OriginalBytes)
+            {
+                try { File.Delete(dlg.FileName); } catch (IOException) { }
+                SearchStatus = "El archivo ya estaba optimizado";
+                MessageBox.Show(
+                    $"No se pudo reducir: la copia no es más pequeña ({Dialogs.FormatSize(result.NewBytes)} frente a {Dialogs.FormatSize(result.OriginalBytes)}).\n\nEl archivo ya está bien comprimido. No se guardó ninguna copia.",
+                    "Reducir tamaño", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            SearchStatus = $"Reducido de {Dialogs.FormatSize(result.OriginalBytes)} a {Dialogs.FormatSize(result.NewBytes)}";
+            var answer = MessageBox.Show(
+                $"Tamaño: {Dialogs.FormatSize(result.OriginalBytes)} → {Dialogs.FormatSize(result.NewBytes)} (−{result.SavedFraction:P0}).\n\nGuardado en:\n{dlg.FileName}\n\n¿Abrir la copia reducida?",
+                "Reducir tamaño", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (answer == MessageBoxResult.Yes && Application.Current.MainWindow?.DataContext is MainViewModel main) main.OpenPath(dlg.FileName);
+        }
+        catch (Exception ex)
+        {
+            try { File.Delete(dlg.FileName + ".tmp"); } catch (IOException) { }
+            ShowError("No se pudo reducir el tamaño", ex);
+        }
+    }
+
     // ================= Exportar páginas como imágenes =================
 
     [RelayCommand]
