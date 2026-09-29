@@ -64,7 +64,7 @@ public sealed partial class MuPdfDocument
                     if (spans.Count == 0) continue;
                     var dominant = spans.OrderByDescending(s => s.Text.Length).First();
                     var text = string.Concat(spans.Select(s => s.Text)).Trim();
-                    lines.Add(new TextLineInfo(FromRect(line.Bbox), text, FormatOf(dominant)));
+                    lines.Add(new TextLineInfo(FromRect(line.Bbox), text, FormatOf(dominant), dominant.Origin.Y));
                 }
                 if (lines.Count > 0) result.Add(new TextBlockInfo(page, FromRect(block.Bbox), lines));
             }
@@ -89,7 +89,8 @@ public sealed partial class MuPdfDocument
         return new TextFormat(family, Math.Round(span.Size, 1), color, bold, italic);
     }
 
-    public double ReplaceText(int page, PdfRect eraseBox, PdfRect placeBox, string text, TextFormat format, TextAlign align, double lineHeightFactor = 0)
+    public double ReplaceText(int page, PdfRect eraseBox, PdfRect placeBox, string text, TextFormat format, TextAlign align,
+        double lineHeightFactor = 0, double? baseline = null)
     {
         lock (NativeLock)
         {
@@ -97,7 +98,7 @@ public sealed partial class MuPdfDocument
             RequireUnrotated(page);
             EraseText(page, eraseBox);
             double size = format.Size;
-            if (!string.IsNullOrWhiteSpace(text)) size = InsertFitted(page, placeBox, text, format, align, lineHeightFactor);
+            if (!string.IsNullOrWhiteSpace(text)) size = InsertFitted(page, placeBox, text, format, align, lineHeightFactor, baseline);
             Invalidate();
             return size;
         }
@@ -109,7 +110,7 @@ public sealed partial class MuPdfDocument
         {
             using var _ = Invariant();
             RequireUnrotated(page);
-            double size = InsertFitted(page, box, text, format, align, 0);
+            double size = InsertFitted(page, box, text, format, align, 0, null);
             Invalidate();
             return size;
         }
@@ -123,7 +124,7 @@ public sealed partial class MuPdfDocument
         p.ApplyRedactions(images: RedactImageNone, graphics: RedactLineArtNone, text: RedactTextRemove);
     }
 
-    private double InsertFitted(int page, PdfRect box, string text, TextFormat format, TextAlign align, double lineHeightFactor)
+    private double InsertFitted(int page, PdfRect box, string text, TextFormat format, TextAlign align, double lineHeightFactor, double? baseline)
     {
         var (fontFile, fontName) = FontResolver.Resolve(format, text);
         double size = format.Size;
@@ -137,6 +138,13 @@ public sealed partial class MuPdfDocument
             var rect = box.Height < size * SingleLineBoxFactor
                 ? box with { Y1 = Math.Max(box.Y1, box.Y0 + size * LineBoxFactor) }
                 : box;
+            if (baseline is double target)
+            {
+                // Cada fuente pone su primera línea base a una distancia distinta del borde superior de la caja.
+                // Se mide y se desplaza la caja para que caiga justo donde estaba la del texto original.
+                double dy = target - (rect.Y0 + FirstBaselineOffset(fontFile, fontName, size, lineHeightFactor));
+                rect = rect with { Y0 = rect.Y0 + dy, Y1 = rect.Y1 + dy };
+            }
             var result = p.InsertTextbox(ToRect(rect), text, (int)align, 0f,
                 [format.Color.R / 255f, format.Color.G / 255f, format.Color.B / 255f], 0, 0f, 1f, null!,
                 fontFile!, fontName, (float)size, lineHeight: lineHeightFactor > 0 ? (float)lineHeightFactor : null);
@@ -146,6 +154,34 @@ public sealed partial class MuPdfDocument
             if (size < min)
                 throw new InvalidOperationException("El texto nuevo no cabe en el espacio disponible. Acórtalo o agrándalo dejando más espacio.");
         }
+    }
+
+    private static readonly Dictionary<(string?, string, double, double), double> BaselineOffsets = [];
+
+    /// <summary>
+    /// Distancia entre el borde superior de una caja y la línea base del primer renglón que MuPDF escribe con esa
+    /// fuente y tamaño. Se mide escribiendo una "H" en un documento de prueba que se descarta.
+    /// </summary>
+    private static double FirstBaselineOffset(string? fontFile, string fontName, double size, double lineHeightFactor)
+    {
+        var key = (fontFile, fontName, size, lineHeightFactor);
+        if (BaselineOffsets.TryGetValue(key, out var cached)) return cached;
+
+        double offset = size * 0.9; // valor razonable si la medición fallara
+        var probe = new Document();
+        try
+        {
+            probe.NewPage(width: 400, height: 400);
+            probe[0].InsertTextbox(new MuPDF.NET.Rect(10, 100, 390, 300), "H", 0, 0f, [0f, 0f, 0f], 0, 0f, 1f, null!,
+                fontFile!, fontName, (float)size, lineHeight: lineHeightFactor > 0 ? (float)lineHeightFactor : null);
+            var span = (probe[0].GetText("dict") as PageInfo)?.Blocks
+                .Where(b => b.Lines is not null).SelectMany(b => b.Lines).SelectMany(l => l.Spans).FirstOrDefault();
+            if (span is not null) offset = span.Origin.Y - 100;
+        }
+        finally { probe.Close(); }
+
+        BaselineOffsets[key] = offset;
+        return offset;
     }
 
     // ---------------- Imágenes ----------------

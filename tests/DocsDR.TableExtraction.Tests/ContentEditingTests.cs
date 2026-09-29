@@ -103,6 +103,41 @@ public class ContentEditingTests : IDisposable
         doc.Dispose();
     }
 
+    [Theory]
+    [InlineData("hebo", 22.5f, "Titulo nuevo")]
+    [InlineData("helv", 11.5f, "Otro texto de prueba")]
+    [InlineData("tiro", 13f, "Linea con acentos áéíóú")]
+    [InlineData("cour", 9.5f, "codigo 123")]
+    [InlineData("helv", 14f, "Precio: 25 € y más")] // fuera de Latin-1: usa una fuente incrustada
+    public void Rewriting_a_line_keeps_its_baseline(string font, float size, string newText)
+    {
+        var path = Create(p => p.InsertText(new Point(40, 100.3f), "Texto original de la linea", fontSize: size, fontName: font));
+        var (doc, ed) = Open(path);
+        var line = ed.GetTextBlocks(0).SelectMany(b => b.Lines).Single();
+
+        var erase = new PdfRect(line.Box.X0, line.Box.Y0 + 1.5, line.Box.X1, line.Box.Y1 - 1.5);
+        var place = new PdfRect(line.Box.X0, line.Box.Y0 - 0.5, line.Box.X1 + 150, line.Box.Y1 + 4);
+        ed.ReplaceText(0, erase, place, newText, line.Format, TextAlign.Left, baseline: line.Baseline);
+
+        var after = ed.GetTextBlocks(0).SelectMany(b => b.Lines).Single();
+        Assert.Equal(line.Baseline, after.Baseline, 0.3); // a la misma altura, sin corrimiento
+        doc.Dispose();
+    }
+
+    [Fact]
+    public void Without_a_baseline_the_text_is_aligned_with_the_top_of_the_box()
+    {
+        // Comportamiento anterior: sirve de referencia de que el ajuste por línea base es lo que corrige la posición.
+        var (doc, ed) = Open(Sample());
+        var fmt = new TextFormat(TextFormat.Serif, 20, new PdfColor(0, 0, 0), false, false);
+
+        ed.AddText(0, new PdfRect(30, 200, 380, 240), "Referencia", fmt, TextAlign.Left);
+
+        var line = ed.GetTextBlocks(0).SelectMany(b => b.Lines).Single(l => l.Text == "Referencia");
+        Assert.True(line.Baseline > 200 && line.Baseline < 240);
+        doc.Dispose();
+    }
+
     [Fact]
     public void New_text_keeps_the_requested_color_and_supports_characters_outside_latin1()
     {

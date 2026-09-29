@@ -678,6 +678,12 @@ public partial class DocumentView : UserControl
         if (_session is not { } session || _editBox is null || _vm is null) return;
         var text = _editBox.Text;
         CloseTextEditor();
+        // Sin cambios no se toca el documento: reescribir el renglón perdería su formato mezclado (negritas, colores).
+        if (!_vm.TextEditChanged(session, text))
+        {
+            _vm.SearchStatus = "Sin cambios";
+            return;
+        }
         _vm.CommitTextEdit(session, text);
     }
 

@@ -12,8 +12,11 @@ namespace DocsDR.App.ViewModels;
 /// <summary>Una edición de texto en curso: qué texto se está cambiando (o nuevo) y con qué formato empezó.</summary>
 public sealed class TextEditSession(
     PageViewModel page, TextBlockInfo? block, PdfRect box, string text, bool isParagraph,
-    TextFormat originalFormat, TextAlign originalAlign)
+    TextFormat originalFormat, TextAlign originalAlign, double baseline = double.NaN)
 {
+    /// <summary>Y de la línea base del primer renglón original (NaN si es texto nuevo).</summary>
+    public double Baseline { get; } = baseline;
+
     public PageViewModel Page { get; } = page;
 
     /// <summary>Bloque de origen; null si es texto nuevo.</summary>
@@ -174,7 +177,8 @@ public sealed partial class DocumentViewModel
         var align = NumberParser.TryParse(text, DecimalSeparator.Auto, out _, out _) ? TextAlign.Right : TextAlign.Left;
         ApplyFormat(format);
         TextAlignment = align;
-        return new TextEditSession(page, block, box, text, paragraph, format, align);
+        double baseline = paragraph ? block.Lines[0].Baseline : line!.Baseline;
+        return new TextEditSession(page, block, box, text, paragraph, format, align, baseline);
     }
 
     /// <summary>Empieza un texto nuevo en el punto indicado, con el formato actual de la barra.</summary>
@@ -219,7 +223,7 @@ public sealed partial class DocumentViewModel
             double factor = s.IsParagraph && s.Block!.Lines.Count > 1
                 ? (s.Block.Lines[^1].Box.Y0 - s.Block.Lines[0].Box.Y0) / (s.Block.Lines.Count - 1) / format.Size
                 : 0;
-            ok = Edit(ed => used = ed.ReplaceText(page, erase, place, text, format, align, factor), false, page);
+            ok = Edit(ed => used = ed.ReplaceText(page, erase, place, text, format, align, factor, baseline: double.IsNaN(s.Baseline) ? null : s.Baseline), false, page);
         }
         if (!ok) return;
 

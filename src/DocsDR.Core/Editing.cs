@@ -39,8 +39,8 @@ public sealed record TextFormat(string Family, double Size, PdfColor Color, bool
     public static IReadOnlyList<string> Families { get; } = [Sans, Serif, Mono];
 }
 
-/// <summary>Un renglón de texto del documento con su formato dominante.</summary>
-public sealed record TextLineInfo(PdfRect Box, string Text, TextFormat Format);
+/// <summary>Un renglón de texto del documento con su formato dominante y la Y de su línea base.</summary>
+public sealed record TextLineInfo(PdfRect Box, string Text, TextFormat Format, double Baseline);
 
 /// <summary>Un bloque (normalmente un párrafo o una celda) formado por renglones consecutivos.</summary>
 public sealed record TextBlockInfo(int PageIndex, PdfRect Box, IReadOnlyList<TextLineInfo> Lines)
@@ -80,7 +80,12 @@ public interface IPdfEditor
     /// y escribe <paramref name="text"/> dentro de <paramref name="placeBox"/> con el formato indicado.
     /// Si no cabe, reduce el tamaño de fuente hasta un 60 %. Devuelve el tamaño finalmente usado.
     /// </summary>
-    double ReplaceText(int page, PdfRect eraseBox, PdfRect placeBox, string text, TextFormat format, TextAlign align, double lineHeightFactor = 0);
+    /// <param name="baseline">
+    /// Y de la línea base que debe tener el primer renglón (normalmente la del texto original), para que el texto
+    /// nuevo quede exactamente a la misma altura aunque cambie la fuente. Null = alinear con el borde de la caja.
+    /// </param>
+    double ReplaceText(int page, PdfRect eraseBox, PdfRect placeBox, string text, TextFormat format, TextAlign align,
+        double lineHeightFactor = 0, double? baseline = null);
 
     /// <summary>Agrega texto nuevo a la página. Devuelve el tamaño de fuente usado.</summary>
     double AddText(int page, PdfRect box, string text, TextFormat format, TextAlign align);
