@@ -48,13 +48,21 @@ Las funciones están agrupadas en pestañas: **Inicio** (abrir, guardar, imprimi
 - **Buscar actualizaciones**: usa [Velopack](https://velopack.io) leyendo las versiones publicadas en GitHub Releases de `DRPCS-D/docs-dr`. Solo funciona en la copia instalada con el instalador; en una copia sin instalar ofrece abrir la página de descargas.
 - Soporte por correo, reporte de errores (Issues) y sitio del proyecto.
 
+## Herramientas de uso diario
+
+- **Buscar y reemplazar** (Ctrl+H, Edición › Buscar y reemplazar…): cambia el texto en todo el documento, renglón por renglón, conservando posición, color y negrita de lo que no cambia. Un renglón donde el texto nuevo no cabe se deja intacto y se avisa. Es un solo paso de deshacer.
+- **PDF buscable (OCR)** (Herramientas › Hacer PDF buscable…): reconoce el texto de las páginas escaneadas y lo agrega como capa invisible; la página se ve igual pero se puede buscar y copiar. Requiere los datos de idioma (`scripts/get-tessdata.ps1`).
+- **Exportar páginas como imágenes** (Archivo, pestaña Páginas): PNG o JPEG a 72–300 ppp, todas las páginas, las elegidas o un rango. Nunca pisa archivos existentes.
+- **Crear PDF desde imágenes** (Archivo, pestaña Páginas): una imagen por página, en el orden que elijas; hoja A4 vertical u horizontal según la imagen.
+- **Recordar la vista**: al cerrar se guardan la posición y el tamaño de la ventana y los documentos abiertos (con página y zoom); se reabren al iniciar. Se desactiva en Ver › Reabrir documentos al iniciar.
+
 ## Edición del contenido (fase 4, pestaña *Edición*)
 
 - **Editar texto**: clic en un renglón (o, con *Editar párrafo completo*, en un párrafo). Se abre un cuadro sobre el texto con su formato original cargado (fuente, tamaño, negrita/cursiva, color) que puedes cambiar; `Intro` aplica y `Esc` cancela. Solo se borra el texto de esa zona: fondos, líneas e imágenes se conservan. Las cifras se alinean a la derecha por defecto.
 - **＋ Texto**: escribe un texto nuevo en cualquier punto de la página (`Ctrl+Intro` aplica).
 - **Editar imagen**: clic para seleccionar (contorno y asas), arrastrar para mover, arrastrar una esquina para redimensionar (mantiene proporciones), `Supr` para eliminar, *Reemplazar imagen…* para cambiarla. **＋ Imagen** inserta una nueva.
 
-Limitaciones: la fuente original se sustituye por la equivalente (Arial, Times New Roman o Courier New); un renglón con formatos mezclados se reescribe con el dominante; el texto que no cabe reduce el tamaño hasta un 60 %; no se edita en páginas giradas ni en escaneadas (sin texto); mover o quitar una imagen quita cualquier imagen que toque su caja.
+Limitaciones: la fuente original se sustituye por la equivalente (Arial, Times New Roman o Courier New); un renglón con formatos mezclados conserva los de lo que no se toca; en PDF con fuentes Type3 la negrita se deduce midiendo el grosor del trazo; el texto que no cabe reduce el tamaño hasta un 60 %; no se edita en páginas giradas ni en escaneadas (sin texto); mover o quitar una imagen quita cualquier imagen que toque su caja.
 
 Nota técnica: MuPDF.NET escribe los números del contenido con la cultura del sistema, lo que corrompe colores y posiciones con decimales en configuraciones con coma decimal; todas las operaciones de escritura se ejecutan con cultura invariante (`MuPdfContentEditor.cs`).
 

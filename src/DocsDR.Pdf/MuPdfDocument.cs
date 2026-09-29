@@ -8,6 +8,8 @@ public sealed class MuPdfService : IPdfService
     public IPdfDocument Open(string path, string? password = null) => new MuPdfDocument(path, password);
 
     public void Merge(IReadOnlyList<string> files, string destPath) => MuPdfDocument.MergeFiles(files, destPath);
+
+    public void ImagesToPdf(IReadOnlyList<string> images, string destPath) => MuPdfDocument.ImagesToPdfFile(images, destPath);
 }
 
 /// <summary>Adaptador de MuPDF.NET. Todo acceso nativo pasa por <see cref="NativeLock"/> (MuPDF no es thread-safe).</summary>

@@ -159,11 +159,19 @@ public sealed partial class MuPdfDocument
         {
             using var _ = Invariant();
             RequireUnrotated(page);
-            EraseText(page, eraseBox);
             double size = format.Size;
-            if (runs is { Count: > 1 } && baseline is double line)
-                size = InsertRuns(page, placeBox, runs, align, line);
-            else if (!string.IsNullOrWhiteSpace(text)) size = InsertFitted(page, placeBox, text, format, align, lineHeightFactor, baseline);
+            if (runs is { Count: > 0 } && baseline is double line)
+            {
+                // Se comprueba que quepa ANTES de borrar: si no cabe, el renglón original queda intacto.
+                var plan = PlanRuns(placeBox, runs);
+                EraseText(page, eraseBox);
+                size = DrawRuns(page, plan, align, line, placeBox);
+            }
+            else
+            {
+                EraseText(page, eraseBox);
+                if (!string.IsNullOrWhiteSpace(text)) size = InsertFitted(page, placeBox, text, format, align, lineHeightFactor, baseline);
+            }
             Invalidate();
             return size;
         }
@@ -221,38 +229,43 @@ public sealed partial class MuPdfDocument
         }
     }
 
-    /// <summary>Escribe un renglón formado por varios tramos, cada uno con su formato, sobre la línea base indicada.</summary>
-    private double InsertRuns(int page, PdfRect box, IReadOnlyList<TextRun> runs, TextAlign align, double baseline)
+    private sealed record RunPlan(IReadOnlyList<TextRun> Runs, List<(string? File, string Name)> Fonts, double Scale, double Total);
+
+    /// <summary>Elige las fuentes y la escala con que cabe un renglón de varios tramos en la caja; lanza si no cabe.</summary>
+    private RunPlan PlanRuns(PdfRect box, IReadOnlyList<TextRun> runs)
     {
         var fonts = runs.Select(r => FontResolver.Resolve(r.Format, r.Text)).ToList();
         double scale = 1;
-        double total;
         while (true)
         {
-            total = 0;
+            double total = 0;
             for (int i = 0; i < runs.Count; i++) total += TextWidth(fonts[i], runs[i].Text, runs[i].Format.Size * scale);
-            if (total <= box.Width + 0.5) break;
+            if (total <= box.Width + 0.5) return new RunPlan(runs, fonts, scale, total);
             scale *= FontShrinkStep;
             if (scale < MinFontScale)
                 throw new InvalidOperationException("El texto nuevo no cabe en el espacio disponible. Acórtalo o agrándalo dejando más espacio.");
         }
+    }
 
+    /// <summary>Escribe un renglón formado por varios tramos, cada uno con su formato, sobre la línea base indicada.</summary>
+    private double DrawRuns(int page, RunPlan plan, TextAlign align, double baseline, PdfRect box)
+    {
         double x = align switch
         {
-            TextAlign.Right => box.X1 - total,
-            TextAlign.Center => box.X0 + (box.Width - total) / 2,
+            TextAlign.Right => box.X1 - plan.Total,
+            TextAlign.Center => box.X0 + (box.Width - plan.Total) / 2,
             _ => box.X0,
         };
-        for (int i = 0; i < runs.Count; i++)
+        for (int i = 0; i < plan.Runs.Count; i++)
         {
-            var (file, name) = fonts[i];
-            var f = runs[i].Format;
-            float size = (float)(f.Size * scale);
-            _doc[page].InsertText(new MuPDF.NET.Point((float)x, (float)baseline), runs[i].Text, size, name,
+            var (file, name) = plan.Fonts[i];
+            var f = plan.Runs[i].Format;
+            float size = (float)(f.Size * plan.Scale);
+            _doc[page].InsertText(new MuPDF.NET.Point((float)x, (float)baseline), plan.Runs[i].Text, size, name,
                 [f.Color.R / 255f, f.Color.G / 255f, f.Color.B / 255f], 0, 0, 1f, null!, file!);
-            x += TextWidth(fonts[i], runs[i].Text, size);
+            x += TextWidth(plan.Fonts[i], plan.Runs[i].Text, size);
         }
-        return Math.Round(runs.Max(r => r.Format.Size) * scale, 2);
+        return Math.Round(plan.Runs.Max(r => r.Format.Size) * plan.Scale, 2);
     }
 
     private static double TextWidth((string? File, string Name) font, string text, double size)

@@ -45,6 +45,9 @@ public interface IPdfService
 
     /// <summary>Une los PDF indicados, en ese orden, en un archivo nuevo.</summary>
     void Merge(IReadOnlyList<string> files, string destPath);
+
+    /// <summary>Crea un PDF con una imagen por página (ajustada a una hoja A4, vertical u horizontal según la imagen).</summary>
+    void ImagesToPdf(IReadOnlyList<string> images, string destPath);
 }
 
 public sealed class PdfPasswordRequiredException(string path) : Exception($"El documento '{path}' requiere contraseña.");

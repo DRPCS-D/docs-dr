@@ -308,6 +308,13 @@ public sealed partial class DocumentViewModel : ObservableObject, IDisposable
             snapshot = ed.CreateSnapshot();
             action(ed);
         }
+        catch (OperationCanceledException)
+        {
+            // La operación decidió no cambiar nada (p. ej. ningún reemplazo cabía): se deja todo como estaba, sin avisos.
+            if (snapshot is not null) ed.RestoreSnapshot(snapshot);
+            AfterStructuralChange();
+            return false;
+        }
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "Error al modificar el documento");

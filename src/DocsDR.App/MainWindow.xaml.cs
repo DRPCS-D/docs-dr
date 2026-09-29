@@ -14,6 +14,22 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = _vm = vm;
         InputBindings.Add(new KeyBinding(new FocusSearchCommand(this), Key.F, ModifierKeys.Control));
+        RestoreWindow();
+    }
+
+    /// <summary>Devuelve la ventana a donde y como estaba al cerrar (si sigue cabiendo en alguna pantalla).</summary>
+    private void RestoreWindow()
+    {
+        if (_vm.WindowPlacement is not { } w) return;
+        bool fits = w.Width >= 600 && w.Height >= 400
+            && w.Left + 100 < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth
+            && w.Left + w.Width - 100 > SystemParameters.VirtualScreenLeft
+            && w.Top >= SystemParameters.VirtualScreenTop - 10
+            && w.Top + 100 < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight;
+        if (!fits) return;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = w.Left; Top = w.Top; Width = w.Width; Height = w.Height;
+        if (w.Maximized) WindowState = WindowState.Maximized;
     }
 
     /// <summary>Al cambiar de pestaña de la cinta se suelta la herramienta activa, para no dibujar o editar sin querer.</summary>
@@ -27,6 +43,9 @@ public partial class MainWindow : Window
     /// <summary>Antes de cerrar la app se ofrece guardar los documentos con cambios.</summary>
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        // Se guarda antes de cerrar los documentos: es lo que se reabrirá la próxima vez.
+        var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+        _vm.SaveView(new Services.WindowPlacement(bounds.Left, bounds.Top, bounds.Width, bounds.Height, WindowState == WindowState.Maximized), null);
         if (!_vm.ConfirmCloseAll()) e.Cancel = true;
     }
 

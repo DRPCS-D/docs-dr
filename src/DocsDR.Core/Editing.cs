@@ -178,6 +178,20 @@ public interface IPdfEditor
     /// <summary>Guarda las páginas indicadas como un PDF nuevo (el documento abierto no cambia).</summary>
     void ExtractPages(IReadOnlyList<int> pages, string destPath);
 
+    // ---- OCR: PDF escaneado → PDF con texto buscable ----
+
+    /// <summary>true si están instalados los datos de idioma del OCR (tessdata).</summary>
+    bool OcrAvailable { get; }
+
+    /// <summary>¿La página es una imagen escaneada sin texto (y no está girada)? Solo esas páginas se reconocen.</summary>
+    bool NeedsOcr(int page);
+
+    /// <summary>Reconoce el texto de la página (lento, se puede llamar desde otro hilo). Null si no hay datos de OCR.</summary>
+    IReadOnlyList<TextWord>? RecognizePage(int page);
+
+    /// <summary>Escribe las palabras reconocidas como texto invisible sobre la imagen: la página se ve igual pero se puede buscar y copiar.</summary>
+    void AddInvisibleText(int page, IReadOnlyList<TextWord> words);
+
     // ---- Deshacer y guardar ----
     byte[] CreateSnapshot();
     void RestoreSnapshot(byte[] snapshot);

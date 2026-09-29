@@ -59,7 +59,16 @@ public partial class DocumentView : UserControl
                 _scroll.ScrollChanged += OnScrollChanged;
             }
             UpdateViewport();
+            ApplyPendingPage();
         };
+    }
+
+    /// <summary>Al reabrir la sesión anterior, va a la página en la que se había quedado el documento.</summary>
+    private void ApplyPendingPage()
+    {
+        if (_vm?.PendingPage is not int page) return;
+        _vm.PendingPage = null;
+        _vm.GoToPage(page);
     }
 
     private void Attach(DocumentViewModel? vm)
@@ -75,6 +84,7 @@ public partial class DocumentView : UserControl
         {
             _vm.ScrollRequested += OnScrollRequested;
             _vm.PropertyChanged += OnVmPropertyChanged;
+            if (IsLoaded) ApplyPendingPage();
         }
     }
 

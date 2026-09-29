@@ -6,7 +6,7 @@ using Microsoft.Win32;
 namespace DocsDR.App.Views;
 
 /// <summary>Diálogos sencillos construidos en código, para no multiplicar archivos XAML.</summary>
-public static class Dialogs
+public static partial class Dialogs
 {
     private static Window Create(string title, UIElement content) => new()
     {
@@ -100,7 +100,11 @@ public static class Dialogs
     }
 
     /// <summary>Lista de PDFs a unir, con orden editable. Devuelve las rutas en orden o null si se cancela.</summary>
-    public static List<string>? AskMerge()
+    public static List<string>? AskMerge() =>
+        AskFiles("Unir PDFs", "Agrega los PDF y ordénalos; se unirán en ese orden.", "Documentos PDF (*.pdf)|*.pdf", "Unir…", minCount: 2);
+
+    /// <summary>Lista de archivos con orden editable (subir/bajar/quitar). Null si se cancela.</summary>
+    public static List<string>? AskFiles(string title, string prompt, string filter, string okText, int minCount)
     {
         var list = new ListBox { Width = 460, Height = 200, SelectionMode = SelectionMode.Single };
         Button Btn(string text) => new() { Content = text, Margin = new Thickness(0, 0, 0, 6), MinWidth = 90 };
@@ -112,13 +116,13 @@ public static class Dialogs
         row.Children.Add(side);
 
         var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(new TextBlock { Text = "Agrega los PDF y ordénalos; se unirán en ese orden." });
+        panel.Children.Add(new TextBlock { Text = prompt });
         panel.Children.Add(row);
-        panel.Children.Add(Buttons(out var ok, "Unir…"));
+        panel.Children.Add(Buttons(out var ok, okText));
 
         add.Click += (_, _) =>
         {
-            var dlg = new OpenFileDialog { Filter = "Documentos PDF (*.pdf)|*.pdf", Multiselect = true, Title = "Agregar PDF" };
+            var dlg = new OpenFileDialog { Filter = filter, Multiselect = true, Title = "Agregar archivos" };
             if (dlg.ShowDialog() == true) foreach (var f in dlg.FileNames) list.Items.Add(f);
         };
         remove.Click += (_, _) => { if (list.SelectedIndex >= 0) list.Items.RemoveAt(list.SelectedIndex); };
@@ -134,10 +138,14 @@ public static class Dialogs
         up.Click += (_, _) => Move(-1);
         down.Click += (_, _) => Move(+1);
 
-        var window = Create("Unir PDFs", panel);
+        var window = Create(title, panel);
         ok.Click += (_, _) =>
         {
-            if (list.Items.Count < 2) { MessageBox.Show(window, "Agrega al menos dos archivos.", "Unir PDFs"); return; }
+            if (list.Items.Count < minCount)
+            {
+                MessageBox.Show(window, minCount == 1 ? "Agrega al menos un archivo." : $"Agrega al menos {minCount} archivos.", title);
+                return;
+            }
             window.DialogResult = true;
         };
         return window.ShowDialog() == true ? list.Items.Cast<string>().ToList() : null;

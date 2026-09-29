@@ -248,14 +248,15 @@ public sealed partial class DocumentViewModel
     }
 
     /// <summary>Caja donde se escribe el texto nuevo: deja espacio a un lado según la alineación.</summary>
-    private static PdfRect PlaceBoxOf(TextEditSession s, double size, TextAlign align)
+    private static PdfRect PlaceBoxOf(TextEditSession s, double size, TextAlign align) =>
+        PlaceBoxOf(s.Box, s.IsParagraph, s.Block!, s.Page.PageWidth, size, align);
+
+    private static PdfRect PlaceBoxOf(PdfRect b, bool isParagraph, TextBlockInfo blockInfo, double pageW, double size, TextAlign align)
     {
-        var b = s.Box;
-        if (s.IsParagraph) return b; // se reajusta dentro del bloque
-        double pageW = s.Page.PageWidth;
-        var block = s.Block!.Box;
+        if (isParagraph) return b; // se reajusta dentro del bloque
+        var block = blockInfo.Box;
         // Un renglón suelto (etiqueta, celda) puede crecer; uno dentro de un párrafo se limita al bloque.
-        double slack = s.Block.Lines.Count == 1 ? 150 : 0;
+        double slack = blockInfo.Lines.Count == 1 ? 150 : 0;
         double y0 = b.Y0 - 0.5;
         double y1 = y0 + Math.Max(b.Height + 2, size * 1.8);
         switch (align)

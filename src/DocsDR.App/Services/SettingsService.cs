@@ -3,6 +3,12 @@ using System.Text.Json;
 
 namespace DocsDR.App.Services;
 
+/// <summary>Un documento abierto al cerrar la app: se reabre en la misma página y zoom.</summary>
+public sealed record SessionEntry(string Path, int Page, double Zoom);
+
+/// <summary>Posición y tamaño de la ventana principal.</summary>
+public sealed record WindowPlacement(double Left, double Top, double Width, double Height, bool Maximized);
+
 /// <summary>Preferencias de usuario persistidas en %AppData%\DocsDR\settings.json.</summary>
 public sealed class SettingsService
 {
@@ -14,6 +20,16 @@ public sealed class SettingsService
     /// <summary>Tema de la aplicación: "Dark" (por defecto) o "Light".</summary>
     public string Theme { get; private set; } = "Dark";
 
+    /// <summary>¿Reabrir al iniciar los documentos que estaban abiertos al cerrar?</summary>
+    public bool RestoreSession { get; private set; } = true;
+
+    public List<SessionEntry> Session { get; private set; } = [];
+    public int SessionSelected { get; private set; }
+    public WindowPlacement? Window { get; private set; }
+
+    /// <summary>Ancho del panel lateral de miniaturas (null = el predeterminado).</summary>
+    public double? SidePanelWidth { get; private set; }
+
     public SettingsService()
     {
         try
@@ -23,6 +39,11 @@ public sealed class SettingsService
                 var data = JsonSerializer.Deserialize<Data>(File.ReadAllText(FilePath));
                 RecentFiles = data?.RecentFiles ?? [];
                 Theme = data?.Theme == "Light" ? "Light" : "Dark";
+                RestoreSession = data?.RestoreSession ?? true;
+                Session = data?.Session ?? [];
+                SessionSelected = data?.SessionSelected ?? 0;
+                Window = data?.Window;
+                SidePanelWidth = data?.SidePanelWidth;
             }
         }
         catch (Exception ex)
@@ -45,11 +66,31 @@ public sealed class SettingsService
         Save();
     }
 
+    public void SetRestoreSession(bool value)
+    {
+        RestoreSession = value;
+        Save();
+    }
+
+    /// <summary>Guarda cómo quedó la ventana y qué documentos había abiertos.</summary>
+    public void SaveView(WindowPlacement window, IReadOnlyList<SessionEntry> session, int selected, double? sidePanelWidth)
+    {
+        Window = window;
+        Session = session.ToList();
+        SessionSelected = selected;
+        SidePanelWidth = sidePanelWidth;
+        Save();
+    }
+
     private void Save()
     {
         try
         {
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(new Data { RecentFiles = RecentFiles, Theme = Theme }));
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(new Data
+            {
+                RecentFiles = RecentFiles, Theme = Theme, RestoreSession = RestoreSession,
+                Session = Session, SessionSelected = SessionSelected, Window = Window, SidePanelWidth = SidePanelWidth,
+            }));
         }
         catch (Exception ex)
         {
@@ -61,5 +102,10 @@ public sealed class SettingsService
     {
         public List<string> RecentFiles { get; set; } = [];
         public string Theme { get; set; } = "Dark";
+        public bool RestoreSession { get; set; } = true;
+        public List<SessionEntry> Session { get; set; } = [];
+        public int SessionSelected { get; set; }
+        public WindowPlacement? Window { get; set; }
+        public double? SidePanelWidth { get; set; }
     }
 }

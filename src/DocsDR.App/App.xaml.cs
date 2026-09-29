@@ -43,9 +43,11 @@ public partial class App : Application
         MainWindow = window;
         window.Show();
 
-        // Asociación de archivos / "Abrir con": la ruta llega como argumento.
-        foreach (var arg in e.Args.Where(a => a.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(a)))
-            Services.GetRequiredService<MainViewModel>().OpenPath(arg);
+        // Asociación de archivos / "Abrir con": la ruta llega como argumento; si no hay ninguno se reabre la sesión anterior.
+        var vm = Services.GetRequiredService<MainViewModel>();
+        var toOpen = e.Args.Where(a => a.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(a)).ToList();
+        if (toOpen.Count == 0) vm.RestorePreviousSession();
+        foreach (var arg in toOpen) vm.OpenPath(arg);
     }
 
     /// <summary>Cambia entre el tema claro y el oscuro (también en las ventanas ya abiertas).</summary>

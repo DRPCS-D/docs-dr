@@ -18,6 +18,7 @@
         <KeyBinding Modifiers="Ctrl" Key="W" Command="{Binding CloseDocumentCommand}" />
         <KeyBinding Modifiers="Ctrl" Key="P" Command="{Binding PrintCommand}" />
         <KeyBinding Modifiers="Ctrl" Key="E" Command="{Binding ConvertToExcelCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="H" Command="{Binding SelectedDocument.ReplaceDialogCommand}" />
         <KeyBinding Modifiers="Ctrl" Key="OemPlus" Command="{Binding SelectedDocument.ZoomInCommand}" />
         <KeyBinding Modifiers="Ctrl" Key="OemMinus" Command="{Binding SelectedDocument.ZoomOutCommand}" />
         <KeyBinding Modifiers="Ctrl" Key="D0" Command="{Binding SelectedDocument.ActualSizeCommand}" />
@@ -46,6 +47,8 @@
                 <MenuItem Header="_Guardar" InputGestureText="Ctrl+S" Command="{Binding SaveCommand}" />
                 <MenuItem Header="Guardar _como…" InputGestureText="Ctrl+Mayús+S" Command="{Binding SaveAsCommand}" />
                 <MenuItem Header="_Unir PDFs…" Command="{Binding MergePdfsCommand}" />
+                <MenuItem Header="Crear PDF desde _imágenes…" Command="{Binding ImagesToPdfCommand}" />
+                <MenuItem Header="_Exportar páginas como imágenes…" Command="{Binding SelectedDocument.ExportImagesCommand}" />
                 <Separator />
                 <MenuItem Header="_Imprimir…" InputGestureText="Ctrl+P" Command="{Binding PrintCommand}" />
                 <MenuItem Header="_Cerrar documento" InputGestureText="Ctrl+W" Command="{Binding CloseDocumentCommand}" />
@@ -55,6 +58,8 @@
             <MenuItem Header="_Editar" IsEnabled="{Binding HasDocument}">
                 <MenuItem Header="_Deshacer" InputGestureText="Ctrl+Z" Command="{Binding SelectedDocument.UndoCommand}" />
                 <MenuItem Header="_Rehacer" InputGestureText="Ctrl+Y" Command="{Binding SelectedDocument.RedoCommand}" />
+                <Separator />
+                <MenuItem Header="_Buscar y reemplazar…" InputGestureText="Ctrl+H" Command="{Binding SelectedDocument.ReplaceDialogCommand}" />
                 <Separator />
                 <MenuItem Header="Editar texto de la anotación…" Command="{Binding SelectedDocument.EditSelectedAnnotationTextCommand}" />
                 <MenuItem Header="Eliminar anotación" InputGestureText="Supr" Command="{Binding SelectedDocument.DeleteSelectedAnnotationCommand}" />
@@ -66,6 +71,7 @@
                 <MenuItem Header="Ajustar al ancho" Command="{Binding SelectedDocument.FitWidthCommand}" />
                 <MenuItem Header="Ajustar a la página" Command="{Binding SelectedDocument.FitPageCommand}" />
                 <Separator />
+                <MenuItem Header="Reabrir documentos al iniciar" IsCheckable="True" IsChecked="{Binding RestoreSession, Mode=TwoWay}" />
                 <MenuItem Header="Tema">
                     <MenuItem Header="Oscuro" IsCheckable="False" IsChecked="{Binding IsDarkTheme, Mode=OneWay}"
                               Command="{Binding SetThemeCommand}" CommandParameter="Dark" />
@@ -86,6 +92,7 @@
             </MenuItem>
             <MenuItem Header="_Herramientas">
                 <MenuItem Header="Convertir a _Excel…" InputGestureText="Ctrl+E" Command="{Binding ConvertToExcelCommand}" />
+                <MenuItem Header="Hacer PDF _buscable (OCR)…" Command="{Binding SelectedDocument.MakeSearchableCommand}" />
             </MenuItem>
             <MenuItem Header="A_yuda">
                 <MenuItem Header="_Buscar actualizaciones…" Command="{Binding CheckUpdatesCommand}" />
@@ -137,6 +144,7 @@
                         <Button Style="{StaticResource ToolButton}" Command="{Binding SearchCommand}" Content="🔍" ToolTip="Buscar" />
                         <Button Style="{StaticResource ToolButton}" Command="{Binding PreviousHitCommand}" Content="↑" ToolTip="Anterior (Shift+F3)" />
                         <Button Style="{StaticResource ToolButton}" Command="{Binding NextHitCommand}" Content="↓" ToolTip="Siguiente (F3)" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ReplaceDialogCommand}" Content="⇄ Reemplazar…" ToolTip="Buscar y reemplazar texto (Ctrl+H)" />
                         <TextBlock Text="{Binding SearchStatus}" VerticalAlignment="Center" Margin="6,0" />
                     </ToolBar>
                 </ToolBarTray>
@@ -280,11 +288,13 @@
                         <Separator />
                         <Button Style="{StaticResource ToolButton}" Command="{Binding ExtractPagesCommand}" Content="⧉ Extraer…" ToolTip="Guarda las páginas marcadas como un PDF nuevo" />
                         <Button Style="{StaticResource ToolButton}" Command="{Binding SplitDocumentCommand}" Content="✂ Dividir…" ToolTip="Divide el documento en varios archivos" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ExportImagesCommand}" Content="🖼 Exportar imágenes…" ToolTip="Guarda las páginas como imágenes PNG o JPEG" />
                         <Separator />
                         <Button Style="{StaticResource ToolButton}" Command="{Binding DeletePagesCommand}" Content="🗑 Eliminar páginas" />
                     </ToolBar>
                     <ToolBar Band="0">
                         <Button Style="{StaticResource ToolButton}" Command="{Binding MergePdfsCommand}" Content="⊞ Unir PDFs…" ToolTip="Combina varios archivos PDF en uno" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ImagesToPdfCommand}" Content="🖼 Imágenes → PDF…" ToolTip="Crea un PDF con una imagen por página" />
                     </ToolBar>
                 </ToolBarTray>
             </TabItem>
@@ -295,6 +305,10 @@
                     <ToolBar>
                         <Button Style="{StaticResource ToolButton}" Command="{Binding ConvertToExcelCommand}" FontWeight="SemiBold"
                                 ToolTip="Detectar tablas y exportar a Excel (Ctrl+E)" Content="📊 Convertir a Excel…" />
+                    </ToolBar>
+                    <ToolBar DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding MakeSearchableCommand}"
+                                ToolTip="Reconoce el texto de las páginas escaneadas para poder buscarlo y copiarlo" Content="🔍 PDF buscable (OCR)…" />
                     </ToolBar>
                 </ToolBarTray>
             </TabItem>

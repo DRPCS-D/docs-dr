@@ -49,14 +49,17 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
     }
 
     [RelayCommand]
-    public void OpenPath(string path)
+    public void OpenPath(string path) => TryOpen(path, interactive: true);
+
+    /// <summary>Abre un PDF. Con <paramref name="interactive"/> false (reabrir la sesión anterior) no pregunta contraseñas ni avisa de archivos que ya no existen.</summary>
+    private DocumentViewModel? TryOpen(string path, bool interactive)
     {
         var existing = Documents.FirstOrDefault(d => string.Equals(d.FilePath, path, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null) { SelectedDocument = existing; return; }
+        if (existing is not null) { SelectedDocument = existing; return existing; }
         if (!File.Exists(path))
         {
-            MessageBox.Show($"No se encontró el archivo:\n{path}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            if (interactive) MessageBox.Show($"No se encontró el archivo:\n{path}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
         }
 
         IPdfDocument? doc = null;
@@ -66,20 +69,21 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
         }
         catch (PdfPasswordRequiredException)
         {
+            if (!interactive) return null;
             var pwd = PasswordDialog.Ask(Path.GetFileName(path));
-            if (pwd is null) return;
+            if (pwd is null) return null;
             try { doc = pdfService.Open(path, pwd); }
             catch (PdfPasswordRequiredException)
             {
                 MessageBox.Show("Contraseña incorrecta.", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                return null;
             }
         }
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "No se pudo abrir {Path}", path);
-            MessageBox.Show($"No se pudo abrir el archivo:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Error);
-            return;
+            if (interactive) MessageBox.Show($"No se pudo abrir el archivo:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Error);
+            return null;
         }
 
         var vm = new DocumentViewModel(doc);
@@ -87,6 +91,7 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
         SelectedDocument = vm;
         RememberRecent(path);
         StatusText = $"{vm.Title} — {vm.PageCount} página(s)";
+        return vm;
     }
 
     [RelayCommand(CanExecute = nameof(HasDocument))]
@@ -187,6 +192,70 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
     {
         if (SelectedDocument is null) return;
         PrintService.Print(SelectedDocument.Document, SelectedDocument.Title);
+    }
+
+    // ================= Imágenes → PDF =================
+
+    [RelayCommand]
+    private void ImagesToPdf()
+    {
+        var files = Dialogs.AskFiles("Crear PDF desde imágenes", "Agrega las imágenes y ordénalas: cada una será una página.",
+            "Imágenes (*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff;*.gif)|*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff;*.gif", "Crear…", minCount: 1);
+        if (files is null) return;
+        var dlg = new SaveFileDialog
+        {
+            Filter = "Documentos PDF (*.pdf)|*.pdf",
+            FileName = Path.GetFileNameWithoutExtension(files[0]) + ".pdf",
+            InitialDirectory = Path.GetDirectoryName(files[0]),
+            Title = "Guardar PDF",
+        };
+        if (dlg.ShowDialog() != true) return;
+        try
+        {
+            pdfService.ImagesToPdf(files, dlg.FileName);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "No se pudo crear el PDF desde imágenes");
+            MessageBox.Show($"No se pudo crear el PDF (¿alguna imagen está dañada o no es compatible?):\n{ex.Message}", "Crear PDF desde imágenes",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        OpenPath(dlg.FileName);
+        StatusText = $"PDF creado con {files.Count} imagen(es)";
+    }
+
+    // ================= Recordar la vista =================
+
+    [ObservableProperty] private bool _restoreSession = settings.RestoreSession;
+
+    partial void OnRestoreSessionChanged(bool value) => settings.SetRestoreSession(value);
+
+    public WindowPlacement? WindowPlacement => settings.Window;
+
+    /// <summary>Guarda la ventana y los documentos abiertos para reabrirlos en el próximo inicio.</summary>
+    public void SaveView(WindowPlacement window, double? sidePanelWidth)
+    {
+        var session = Documents
+            .Where(d => File.Exists(d.FilePath))
+            .Select(d => new SessionEntry(d.FilePath, d.CurrentPage - 1, d.Zoom))
+            .ToList();
+        int selected = SelectedDocument is null ? 0 : Math.Max(0, session.FindIndex(e => e.Path == SelectedDocument.FilePath));
+        settings.SaveView(window, session, selected, sidePanelWidth);
+    }
+
+    /// <summary>Reabre los documentos de la sesión anterior (si la opción está activa). Los que ya no existen se omiten.</summary>
+    public void RestorePreviousSession()
+    {
+        if (!settings.RestoreSession) return;
+        foreach (var entry in settings.Session)
+        {
+            var vm = TryOpen(entry.Path, interactive: false);
+            if (vm is null) continue;
+            vm.SetZoom(entry.Zoom);
+            vm.PendingPage = entry.Page;
+        }
+        if (Documents.Count > 0) SelectedDocument = Documents[Math.Clamp(settings.SessionSelected, 0, Documents.Count - 1)];
     }
 
     [RelayCommand]
