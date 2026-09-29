@@ -41,6 +41,7 @@ public static class AppInfo
         new("Microsoft.Extensions.DependencyInjection", "Microsoft", "MIT", "https://github.com/dotnet/runtime"),
         new("Serilog", "Serilog Contributors", "Apache-2.0", "https://serilog.net"),
         new("Velopack", "Velopack Ltd", "MIT", "https://velopack.io"),
+        new("Tesseract OCR (datos de idioma spa y eng)", "Tesseract OCR contributors", "Apache-2.0", "https://github.com/tesseract-ocr/tessdata_fast"),
         new(".NET y WPF", "Microsoft", "MIT", "https://dot.net"),
     ];
 

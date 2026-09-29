@@ -34,6 +34,21 @@ dotnet publish (Join-Path $root 'src\DocsDR.App\DocsDR.App.csproj') `
     -o $publish
 if ($LASTEXITCODE -ne 0) { throw "Falló la publicación" }
 
+# Datos de idioma del OCR (español e inglés, ~6 MB): se descargan una vez a artifacts\tessdata y se incluyen en el
+# instalador, en la carpeta "tessdata" junto al ejecutable (donde DOCS-DR los busca). Licencia Apache-2.0.
+$tessCache = Join-Path $root 'artifacts\tessdata'
+New-Item -ItemType Directory -Force $tessCache | Out-Null
+foreach ($lang in 'spa', 'eng') {
+    $file = Join-Path $tessCache "$lang.traineddata"
+    if (-not (Test-Path $file)) {
+        Write-Host "Descargando datos de OCR ($lang)..."
+        Invoke-WebRequest "https://github.com/tesseract-ocr/tessdata_fast/raw/main/$lang.traineddata" -OutFile $file
+    }
+}
+$tessDest = Join-Path $publish 'tessdata'
+New-Item -ItemType Directory -Force $tessDest | Out-Null
+Copy-Item (Join-Path $tessCache '*.traineddata') $tessDest
+
 Write-Host "2/2 Creando el instalador con Velopack..."
 vpk pack `
     --packId DocsDR `
