@@ -35,6 +35,8 @@ public partial class App : Application
             .AddTransient<MainWindow>()
             .BuildServiceProvider();
 
+        ApplyTheme(Services.GetRequiredService<SettingsService>().Theme);
+
         var window = Services.GetRequiredService<MainWindow>();
         MainWindow = window;
         window.Show();
@@ -43,6 +45,12 @@ public partial class App : Application
         foreach (var arg in e.Args.Where(a => a.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(a)))
             Services.GetRequiredService<MainViewModel>().OpenPath(arg);
     }
+
+    /// <summary>Cambia entre el tema claro y el oscuro (también en las ventanas ya abiertas).</summary>
+#pragma warning disable WPF0001 // ThemeMode es la API oficial de temas de WPF (.NET 9+), aún marcada como experimental
+    public static void ApplyTheme(string theme) =>
+        Current.ThemeMode = theme == "Light" ? ThemeMode.Light : ThemeMode.Dark;
+#pragma warning restore WPF0001
 
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {

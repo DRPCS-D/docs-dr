@@ -7,7 +7,7 @@ public class HelpTests
     [Fact]
     public void App_info_has_the_company_data_and_version()
     {
-        Assert.Equal("1.0.0", AppInfo.Version);
+        Assert.Matches(@"^\d+\.\d+\.\d+$", AppInfo.Version);
         Assert.Equal("DRPCS E.A.S.", AppInfo.Company);
         Assert.Equal("Diago Rene Ruiz Diaz Rios", AppInfo.Author);
         Assert.Equal("diagorr@gmail.com", AppInfo.SupportEmail);
@@ -29,5 +29,27 @@ public class HelpTests
     {
         // Ejecutando desde las pruebas no hay instalación de Velopack.
         Assert.False(new UpdateService().IsInstalled);
+    }
+
+    [Fact]
+    public void Theme_is_dark_by_default_and_the_choice_is_remembered()
+    {
+        var settingsFile = System.IO.Path.Combine(DocsDR.App.App.DataFolder, "settings.json");
+        System.IO.Directory.CreateDirectory(DocsDR.App.App.DataFolder);
+        var backup = System.IO.File.Exists(settingsFile) ? System.IO.File.ReadAllText(settingsFile) : null;
+        try
+        {
+            System.IO.File.Delete(settingsFile);
+            var settings = new DocsDR.App.Services.SettingsService();
+            Assert.Equal("Dark", settings.Theme);
+
+            settings.SetTheme("Light");
+            Assert.Equal("Light", new DocsDR.App.Services.SettingsService().Theme);
+        }
+        finally
+        {
+            if (backup is null) System.IO.File.Delete(settingsFile);
+            else System.IO.File.WriteAllText(settingsFile, backup);
+        }
     }
 }

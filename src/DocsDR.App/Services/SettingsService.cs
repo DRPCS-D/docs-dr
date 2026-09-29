@@ -11,12 +11,19 @@ public sealed class SettingsService
 
     public List<string> RecentFiles { get; private set; } = [];
 
+    /// <summary>Tema de la aplicación: "Dark" (por defecto) o "Light".</summary>
+    public string Theme { get; private set; } = "Dark";
+
     public SettingsService()
     {
         try
         {
             if (File.Exists(FilePath))
-                RecentFiles = JsonSerializer.Deserialize<Data>(File.ReadAllText(FilePath))?.RecentFiles ?? [];
+            {
+                var data = JsonSerializer.Deserialize<Data>(File.ReadAllText(FilePath));
+                RecentFiles = data?.RecentFiles ?? [];
+                Theme = data?.Theme == "Light" ? "Light" : "Dark";
+            }
         }
         catch (Exception ex)
         {
@@ -32,11 +39,17 @@ public sealed class SettingsService
         Save();
     }
 
+    public void SetTheme(string theme)
+    {
+        Theme = theme == "Light" ? "Light" : "Dark";
+        Save();
+    }
+
     private void Save()
     {
         try
         {
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(new Data { RecentFiles = RecentFiles }));
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(new Data { RecentFiles = RecentFiles, Theme = Theme }));
         }
         catch (Exception ex)
         {
@@ -47,5 +60,6 @@ public sealed class SettingsService
     private sealed class Data
     {
         public List<string> RecentFiles { get; set; } = [];
+        public string Theme { get; set; } = "Dark";
     }
 }

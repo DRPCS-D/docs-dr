@@ -25,6 +25,21 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
 
     public bool HasDocument => SelectedDocument is not null;
 
+    // ---- Tema claro / oscuro ----
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLightTheme))]
+    private bool _isDarkTheme = settings.Theme != "Light";
+
+    public bool IsLightTheme => !IsDarkTheme;
+
+    [RelayCommand]
+    private void SetTheme(string theme)
+    {
+        settings.SetTheme(theme);
+        IsDarkTheme = settings.Theme == "Dark";
+        App.ApplyTheme(settings.Theme);
+    }
+
     [RelayCommand]
     private void Open()
     {

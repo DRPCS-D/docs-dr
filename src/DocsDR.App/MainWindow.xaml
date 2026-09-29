@@ -59,12 +59,19 @@
                 <MenuItem Header="Editar texto de la anotación…" Command="{Binding SelectedDocument.EditSelectedAnnotationTextCommand}" />
                 <MenuItem Header="Eliminar anotación" InputGestureText="Supr" Command="{Binding SelectedDocument.DeleteSelectedAnnotationCommand}" />
             </MenuItem>
-            <MenuItem Header="_Ver" IsEnabled="{Binding HasDocument}">
+            <MenuItem Header="_Ver">
                 <MenuItem Header="Acercar" InputGestureText="Ctrl++" Command="{Binding SelectedDocument.ZoomInCommand}" />
                 <MenuItem Header="Alejar" InputGestureText="Ctrl+-" Command="{Binding SelectedDocument.ZoomOutCommand}" />
                 <MenuItem Header="Tamaño real" InputGestureText="Ctrl+0" Command="{Binding SelectedDocument.ActualSizeCommand}" />
                 <MenuItem Header="Ajustar al ancho" Command="{Binding SelectedDocument.FitWidthCommand}" />
                 <MenuItem Header="Ajustar a la página" Command="{Binding SelectedDocument.FitPageCommand}" />
+                <Separator />
+                <MenuItem Header="Tema">
+                    <MenuItem Header="Oscuro" IsCheckable="False" IsChecked="{Binding IsDarkTheme, Mode=OneWay}"
+                              Command="{Binding SetThemeCommand}" CommandParameter="Dark" />
+                    <MenuItem Header="Claro" IsCheckable="False" IsChecked="{Binding IsLightTheme, Mode=OneWay}"
+                              Command="{Binding SetThemeCommand}" CommandParameter="Light" />
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="_Páginas" IsEnabled="{Binding HasDocument}">
                 <MenuItem Header="Rotar a la izquierda" Command="{Binding SelectedDocument.RotateLeftCommand}" />

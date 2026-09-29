@@ -40,7 +40,7 @@ El instalador no está firmado: Windows SmartScreen o el antivirus pueden mostra
 
 ## Cinta de opciones
 
-Las funciones están agrupadas en pestañas: **Inicio** (abrir, guardar, imprimir, deshacer, navegación, zoom, búsqueda), **Edición**, **Anotaciones**, **Páginas** y **Convertir**. La ayuda (acerca de, actualizaciones, soporte) está en el menú **Ayuda**. Al cambiar de pestaña se suelta la herramienta activa.
+Las funciones están agrupadas en pestañas: **Inicio** (abrir, guardar, imprimir, deshacer, navegación, zoom, búsqueda), **Edición**, **Anotaciones**, **Páginas** y **Convertir**. El tema (oscuro por defecto o claro) se cambia en **Ver › Tema**. La ayuda (acerca de, actualizaciones, soporte) está en el menú **Ayuda**. Al cambiar de pestaña se suelta la herramienta activa.
 
 ## Ayuda y actualizaciones
 
