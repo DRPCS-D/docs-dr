@@ -291,21 +291,6 @@
                     </ToolBar>
                 </ToolBarTray>
             </TabItem>
-
-            <!-- 6 · Ayuda -->
-            <TabItem Header="Ayuda" FontWeight="SemiBold">
-                <ToolBarTray>
-                    <ToolBar>
-                        <Button Style="{StaticResource ToolButton}" Command="{Binding ShowAboutCommand}" Content="ℹ Acerca de" ToolTip="Versión, autor y licencias (F1)" />
-                        <Button Style="{StaticResource ToolButton}" Command="{Binding CheckUpdatesCommand}" Content="⟳ Buscar actualizaciones" ToolTip="Comprueba si hay una versión nueva y la instala" />
-                    </ToolBar>
-                    <ToolBar>
-                        <Button Style="{StaticResource ToolButton}" Command="{Binding OpenSupportCommand}" Content="✉ Soporte" ToolTip="Escribir un correo a soporte" />
-                        <Button Style="{StaticResource ToolButton}" Command="{Binding ReportIssueCommand}" Content="🐞 Reportar un error" ToolTip="Abre la página de incidencias del proyecto" />
-                        <Button Style="{StaticResource ToolButton}" Command="{Binding OpenRepositoryCommand}" Content="🌐 Sitio del proyecto" ToolTip="Abre el repositorio en GitHub" />
-                    </ToolBar>
-                </ToolBarTray>
-            </TabItem>
         </TabControl>
 
         <StatusBar DockPanel.Dock="Bottom">
