@@ -12,8 +12,12 @@ namespace DocsDR.App.ViewModels;
 /// <summary>Una edición de texto en curso: qué texto se está cambiando (o nuevo) y con qué formato empezó.</summary>
 public sealed class TextEditSession(
     PageViewModel page, TextBlockInfo? block, PdfRect box, string text, bool isParagraph,
-    TextFormat originalFormat, TextAlign originalAlign, double baseline = double.NaN)
+    TextFormat originalFormat, TextAlign originalAlign, double baseline = double.NaN,
+    IReadOnlyList<TextRun>? runs = null)
 {
+    /// <summary>Tramos con formato propio del renglón editado (null si es de un solo formato, un párrafo o texto nuevo).</summary>
+    public IReadOnlyList<TextRun>? Runs { get; } = runs;
+
     /// <summary>Y de la línea base del primer renglón original (NaN si es texto nuevo).</summary>
     public double Baseline { get; } = baseline;
 
@@ -178,7 +182,7 @@ public sealed partial class DocumentViewModel
         ApplyFormat(format);
         TextAlignment = align;
         double baseline = paragraph ? block.Lines[0].Baseline : line!.Baseline;
-        return new TextEditSession(page, block, box, text, paragraph, format, align, baseline);
+        return new TextEditSession(page, block, box, text, paragraph, format, align, baseline, paragraph ? null : line!.Runs);
     }
 
     /// <summary>Empieza un texto nuevo en el punto indicado, con el formato actual de la barra.</summary>
@@ -223,7 +227,11 @@ public sealed partial class DocumentViewModel
             double factor = s.IsParagraph && s.Block!.Lines.Count > 1
                 ? (s.Block.Lines[^1].Box.Y0 - s.Block.Lines[0].Box.Y0) / (s.Block.Lines.Count - 1) / format.Size
                 : 0;
-            ok = Edit(ed => used = ed.ReplaceText(page, erase, place, text, format, align, factor, baseline: double.IsNaN(s.Baseline) ? null : s.Baseline), false, page);
+            // Si no se tocó el formato, un renglón con varios formatos los conserva en lo que no se cambió.
+            var runs = s.Runs is { Count: > 1 } && format == s.OriginalFormat && !s.IsParagraph
+                ? TextRunMapper.Remap(s.Runs, text) : null;
+            ok = Edit(ed => used = ed.ReplaceText(page, erase, place, text, format, align, factor,
+                baseline: double.IsNaN(s.Baseline) ? null : s.Baseline, runs: runs), false, page);
         }
         if (!ok) return;
 

@@ -125,6 +125,48 @@ public class ContentEditingTests : IDisposable
     }
 
     [Fact]
+    public void Editing_a_multicolor_line_keeps_the_color_of_the_untouched_parts()
+    {
+        var red = new float[] { 0.8f, 0.1f, 0.1f };
+        var path = Create(p =>
+        {
+            p.InsertText(new Point(40, 100), "La app hoy ", fontSize: 13, fontName: "helv", color: [0f, 0f, 0f]);
+            p.InsertText(new Point(40 + Utils.GetTextLength("La app hoy ", "helv", 13), 100), "guarda muy bien", fontSize: 13, fontName: "hebo", color: red);
+        });
+        var (doc, ed) = Open(path);
+        var line = ed.GetTextBlocks(0).SelectMany(b => b.Lines).Single();
+        Assert.Equal(2, line.Runs!.Count);
+
+        var runs = TextRunMapper.Remap(line.Runs, "La app hoy guarda mucho bien");
+        var erase = new PdfRect(line.Box.X0, line.Box.Y0 + 1.5, line.Box.X1, line.Box.Y1 - 1.5);
+        var place = new PdfRect(line.Box.X0, line.Box.Y0 - 0.5, line.Box.X1 + 150, line.Box.Y1 + 4);
+        ed.ReplaceText(0, erase, place, "La app hoy guarda mucho bien", line.Format, TextAlign.Left, baseline: line.Baseline, runs: runs);
+
+        var after = ed.GetTextBlocks(0).SelectMany(b => b.Lines).Single();
+        Assert.Equal("La app hoy guarda mucho bien", after.Text);
+        Assert.Equal(2, after.Runs!.Count);
+        Assert.Equal(new PdfColor(0, 0, 0), after.Runs[0].Format.Color);
+        Assert.Equal(new PdfColor(204, 26, 26), after.Runs[1].Format.Color);
+        Assert.True(after.Runs[1].Format.Bold);
+        Assert.Equal(line.Baseline, after.Baseline, 0.3);
+        doc.Dispose();
+    }
+
+    [Fact]
+    public void Remap_gives_typed_text_the_format_of_the_previous_character()
+    {
+        TextFormat A = new("Arial", 12, new PdfColor(0, 0, 0), false, false), B = A with { Bold = true };
+        var old = new[] { new TextRun("Hola ", A), new TextRun("mundo", B), new TextRun("!", A) };
+
+        Assert.Equal([("Hola ", A), ("mundo cruel", B), ("!", A)], Pairs(TextRunMapper.Remap(old, "Hola mundo cruel!")));
+        Assert.Equal([("Hola ", A), ("todo", B), ("!", A)], Pairs(TextRunMapper.Remap(old, "Hola todo!")));
+        Assert.Equal([("Adiós ", A), ("mundo", B), ("!", A)], Pairs(TextRunMapper.Remap(old, "Adiós mundo!")));
+        Assert.Equal([("Hola ", A)], Pairs(TextRunMapper.Remap(old, "Hola ")));
+
+        static (string, TextFormat)[] Pairs(IReadOnlyList<TextRun> r) => r.Select(x => (x.Text, x.Format)).ToArray();
+    }
+
+    [Fact]
     public void Without_a_baseline_the_text_is_aligned_with_the_top_of_the_box()
     {
         // Comportamiento anterior: sirve de referencia de que el ajuste por línea base es lo que corrige la posición.

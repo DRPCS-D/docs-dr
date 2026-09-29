@@ -40,7 +40,65 @@ public sealed record TextFormat(string Family, double Size, PdfColor Color, bool
 }
 
 /// <summary>Un renglón de texto del documento con su formato dominante y la Y de su línea base.</summary>
-public sealed record TextLineInfo(PdfRect Box, string Text, TextFormat Format, double Baseline);
+public sealed record TextLineInfo(PdfRect Box, string Text, TextFormat Format, double Baseline, IReadOnlyList<TextRun>? Runs = null);
+
+/// <summary>Un tramo de un renglón con su propio formato (un renglón puede mezclar colores, negritas o tamaños).</summary>
+public sealed record TextRun(string Text, TextFormat Format);
+
+/// <summary>Reparte un texto editado entre los tramos originales para que lo que no se tocó conserve su formato.</summary>
+public static class TextRunMapper
+{
+    public static IReadOnlyList<TextRun> Remap(IReadOnlyList<TextRun> old, string newText)
+    {
+        string oldText = string.Concat(old.Select(r => r.Text));
+        int max = Math.Min(oldText.Length, newText.Length);
+        int prefix = 0;
+        while (prefix < max && oldText[prefix] == newText[prefix]) prefix++;
+        int suffix = 0;
+        while (suffix < max - prefix && oldText[oldText.Length - 1 - suffix] == newText[newText.Length - 1 - suffix]) suffix++;
+
+        // Lo que reemplaza texto toma el formato del primer carácter reemplazado; lo que se inserta sin reemplazar
+        // nada, el del carácter anterior (como al teclear en un editor de texto).
+        bool replaces = oldText.Length - suffix > prefix;
+        var midFormat = FormatAt(old, replaces ? prefix : Math.Max(0, prefix - 1));
+        var result = new List<TextRun>();
+        void Add(string text, TextFormat f)
+        {
+            if (text.Length == 0) return;
+            if (result.Count > 0 && result[^1].Format == f) result[^1] = result[^1] with { Text = result[^1].Text + text };
+            else result.Add(new TextRun(text, f));
+        }
+
+        int pos = 0;
+        foreach (var r in old)
+        {
+            int end = pos + r.Text.Length;
+            if (pos < prefix) Add(r.Text[..(Math.Min(end, prefix) - pos)], r.Format);
+            pos = end;
+        }
+        Add(newText.Substring(prefix, newText.Length - prefix - suffix), midFormat);
+        int suffixStart = oldText.Length - suffix;
+        pos = 0;
+        foreach (var r in old)
+        {
+            int end = pos + r.Text.Length;
+            if (end > suffixStart) Add(r.Text[(Math.Max(pos, suffixStart) - pos)..], r.Format);
+            pos = end;
+        }
+        return result;
+    }
+
+    private static TextFormat FormatAt(IReadOnlyList<TextRun> runs, int index)
+    {
+        int pos = 0;
+        foreach (var r in runs)
+        {
+            pos += r.Text.Length;
+            if (index < pos) return r.Format;
+        }
+        return runs[^1].Format;
+    }
+}
 
 /// <summary>Un bloque (normalmente un párrafo o una celda) formado por renglones consecutivos.</summary>
 public sealed record TextBlockInfo(int PageIndex, PdfRect Box, IReadOnlyList<TextLineInfo> Lines)
@@ -84,8 +142,13 @@ public interface IPdfEditor
     /// Y de la línea base que debe tener el primer renglón (normalmente la del texto original), para que el texto
     /// nuevo quede exactamente a la misma altura aunque cambie la fuente. Null = alinear con el borde de la caja.
     /// </param>
+    /// <param name="runs">
+    /// Renglón con formatos mezclados: cada tramo se escribe con su formato, uno tras otro, en una sola línea
+    /// (requiere <paramref name="baseline"/>). Si es null se escribe todo con <paramref name="format"/>.
+    /// </param>
     double ReplaceText(int page, PdfRect eraseBox, PdfRect placeBox, string text, TextFormat format, TextAlign align,
-        double lineHeightFactor = 0, double? baseline = null);
+        double lineHeightFactor = 0, double? baseline = null,
+        IReadOnlyList<TextRun>? runs = null);
 
     /// <summary>Agrega texto nuevo a la página. Devuelve el tamaño de fuente usado.</summary>
     double AddText(int page, PdfRect box, string text, TextFormat format, TextAlign align);

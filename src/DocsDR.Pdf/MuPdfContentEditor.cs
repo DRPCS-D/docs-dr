@@ -64,12 +64,28 @@ public sealed partial class MuPdfDocument
                     if (spans.Count == 0) continue;
                     var dominant = spans.OrderByDescending(s => s.Text.Length).First();
                     var text = string.Concat(spans.Select(s => s.Text)).Trim();
-                    lines.Add(new TextLineInfo(FromRect(line.Bbox), text, FormatOf(dominant), dominant.Origin.Y));
+                    lines.Add(new TextLineInfo(FromRect(line.Bbox), text, FormatOf(dominant), dominant.Origin.Y, RunsOf(spans)));
                 }
                 if (lines.Count > 0) result.Add(new TextBlockInfo(page, FromRect(block.Bbox), lines));
             }
         }
         return result;
+    }
+
+    /// <summary>Tramos con formato propio de un renglón (null si todo el renglón tiene el mismo formato).</summary>
+    private static IReadOnlyList<TextRun>? RunsOf(List<Span> spans)
+    {
+        var runs = new List<TextRun>();
+        foreach (var s in spans)
+        {
+            var f = FormatOf(s);
+            if (runs.Count > 0 && runs[^1].Format == f) runs[^1] = runs[^1] with { Text = runs[^1].Text + s.Text };
+            else runs.Add(new TextRun(s.Text, f));
+        }
+        if (runs.Count < 2) return null;
+        runs[0] = runs[0] with { Text = runs[0].Text.TrimStart() };
+        runs[^1] = runs[^1] with { Text = runs[^1].Text.TrimEnd() };
+        return runs.Where(r => r.Text.Length > 0).ToList();
     }
 
     /// <summary>Deduce familia, negrita, cursiva y color de un tramo de texto.</summary>
@@ -90,7 +106,7 @@ public sealed partial class MuPdfDocument
     }
 
     public double ReplaceText(int page, PdfRect eraseBox, PdfRect placeBox, string text, TextFormat format, TextAlign align,
-        double lineHeightFactor = 0, double? baseline = null)
+        double lineHeightFactor = 0, double? baseline = null, IReadOnlyList<TextRun>? runs = null)
     {
         lock (NativeLock)
         {
@@ -98,7 +114,9 @@ public sealed partial class MuPdfDocument
             RequireUnrotated(page);
             EraseText(page, eraseBox);
             double size = format.Size;
-            if (!string.IsNullOrWhiteSpace(text)) size = InsertFitted(page, placeBox, text, format, align, lineHeightFactor, baseline);
+            if (runs is { Count: > 1 } && baseline is double line)
+                size = InsertRuns(page, placeBox, runs, align, line);
+            else if (!string.IsNullOrWhiteSpace(text)) size = InsertFitted(page, placeBox, text, format, align, lineHeightFactor, baseline);
             Invalidate();
             return size;
         }
@@ -154,6 +172,46 @@ public sealed partial class MuPdfDocument
             if (size < min)
                 throw new InvalidOperationException("El texto nuevo no cabe en el espacio disponible. Acórtalo o agrándalo dejando más espacio.");
         }
+    }
+
+    /// <summary>Escribe un renglón formado por varios tramos, cada uno con su formato, sobre la línea base indicada.</summary>
+    private double InsertRuns(int page, PdfRect box, IReadOnlyList<TextRun> runs, TextAlign align, double baseline)
+    {
+        var fonts = runs.Select(r => FontResolver.Resolve(r.Format, r.Text)).ToList();
+        double scale = 1;
+        double total;
+        while (true)
+        {
+            total = 0;
+            for (int i = 0; i < runs.Count; i++) total += TextWidth(fonts[i], runs[i].Text, runs[i].Format.Size * scale);
+            if (total <= box.Width + 0.5) break;
+            scale *= FontShrinkStep;
+            if (scale < MinFontScale)
+                throw new InvalidOperationException("El texto nuevo no cabe en el espacio disponible. Acórtalo o agrándalo dejando más espacio.");
+        }
+
+        double x = align switch
+        {
+            TextAlign.Right => box.X1 - total,
+            TextAlign.Center => box.X0 + (box.Width - total) / 2,
+            _ => box.X0,
+        };
+        for (int i = 0; i < runs.Count; i++)
+        {
+            var (file, name) = fonts[i];
+            var f = runs[i].Format;
+            float size = (float)(f.Size * scale);
+            _doc[page].InsertText(new MuPDF.NET.Point((float)x, (float)baseline), runs[i].Text, size, name,
+                [f.Color.R / 255f, f.Color.G / 255f, f.Color.B / 255f], 0, 0, 1f, null!, file!);
+            x += TextWidth(fonts[i], runs[i].Text, size);
+        }
+        return Math.Round(runs.Max(r => r.Format.Size) * scale, 2);
+    }
+
+    private static double TextWidth((string? File, string Name) font, string text, double size)
+    {
+        if (font.File is null) return Utils.GetTextLength(text, font.Name, (float)size);
+        return new MuPDF.NET.Font(fontFile: font.File).TextLength(text, (float)size);
     }
 
     private static readonly Dictionary<(string?, string, double, double), double> BaselineOffsets = [];
