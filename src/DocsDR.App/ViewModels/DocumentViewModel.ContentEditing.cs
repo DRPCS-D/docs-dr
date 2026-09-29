@@ -223,6 +223,13 @@ public sealed partial class DocumentViewModel
             var b = s.Box;
             double inset = Math.Min(1.5, b.Height * 0.15);
             var erase = new PdfRect(b.X0, b.Y0 + inset, b.X1, b.Y1 - inset);
+            if (!s.IsParagraph && !double.IsNaN(s.Baseline))
+            {
+                // MuPDF borra cualquier letra que toque el rectángulo. En titulares grandes los renglones se rozan,
+                // así que se borra solo una franja alrededor de la línea base (cada letra se quita entera).
+                double size = s.Runs?.Max(r => r.Format.Size) ?? s.OriginalFormat.Size;
+                erase = new PdfRect(b.X0, Math.Max(erase.Y0, s.Baseline - 0.72 * size), b.X1, Math.Min(erase.Y1, s.Baseline));
+            }
             var place = PlaceBoxOf(s, format.Size, align);
             double factor = s.IsParagraph && s.Block!.Lines.Count > 1
                 ? (s.Block.Lines[^1].Box.Y0 - s.Block.Lines[0].Box.Y0) / (s.Block.Lines.Count - 1) / format.Size

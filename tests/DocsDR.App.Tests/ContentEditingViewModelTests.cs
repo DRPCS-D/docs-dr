@@ -20,7 +20,7 @@ public class ContentEditingViewModelTests : IDisposable
 
     public void Dispose() => CultureInfo.CurrentCulture = _previous;
 
-    private static DocumentViewModel Open(bool withImage = false)
+    private static DocumentViewModel Open(bool withImage = false, bool headlines = false)
     {
         var path = Path.Combine(Path.GetTempPath(), "docsdr-app-tests", $"{Guid.NewGuid():N}.pdf");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -35,6 +35,12 @@ public class ContentEditingViewModelTests : IDisposable
                 p.InsertText(new Point(30, 60), "Titulo en rojo", fontSize: 14, fontName: "hebo", color: [0.8f, 0f, 0f]);
                 p.InsertText(new Point(30, 90), "Total", fontSize: 11.5f, fontName: "helv");
                 p.InsertText(new Point(150, 90), "1.234,56", fontSize: 11.5f, fontName: "helv");
+                if (headlines)
+                {
+                    // Dos titulares grandes casi pegados (cajas de renglón superpuestas), con letras con cola.
+                    p.InsertText(new Point(30, 150), "Gran apuesta", fontSize: 34, fontName: "helv");
+                    p.InsertText(new Point(30, 183), "quejumbrosa", fontSize: 34, fontName: "hebo");
+                }
                 if (withImage) p.InsertImage(new Rect(100, 150, 200, 210), stream: SolidPng, keepProportion: false);
                 d.Save(path);
                 d.Close();
@@ -51,6 +57,25 @@ public class ContentEditingViewModelTests : IDisposable
     }
 
     private static string[] Words(DocumentViewModel vm) => vm.Document.GetWords(0).Select(w => w.Text).ToArray();
+
+    [Fact]
+    public void Editing_a_big_headline_does_not_erase_the_line_above_it()
+    {
+        var vm = Open(headlines: true);
+        var lines = ((IPdfEditor)vm.Document).GetTextBlocks(0).SelectMany(b => b.Lines).ToList();
+        Assert.True(lines.Single(l => l.Text == "Gran apuesta").Box.Y1 > lines.Single(l => l.Text == "quejumbrosa").Box.Y0); // se superponen
+
+        foreach (var (old, text) in new[] { ("Gran apuesta", "Gran apuesta!"), ("quejumbrosa", "quejumbrosas") })
+        {
+            var session = vm.BeginTextEdit(vm.Pages[0], CenterOf(vm, old));
+            Assert.NotNull(session);
+            vm.CommitTextEdit(session, text);
+        }
+
+        var after = ((IPdfEditor)vm.Document).GetTextBlocks(0).SelectMany(b => b.Lines).Select(l => l.Text).ToList();
+        Assert.Contains("Gran apuesta!", after);
+        Assert.Contains("quejumbrosas", after);
+    }
 
     [Fact]
     public void Begin_edit_loads_the_original_format_into_the_toolbar_controls()
