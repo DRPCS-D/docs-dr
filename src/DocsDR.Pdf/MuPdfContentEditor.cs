@@ -64,7 +64,7 @@ public sealed partial class MuPdfDocument
                     if (spans.Count == 0) continue;
                     var dominant = spans.OrderByDescending(s => s.Text.Length).First();
                     var text = string.Concat(spans.Select(s => s.Text)).Trim();
-                    lines.Add(new TextLineInfo(FromRect(line.Bbox), text, FormatOf(dominant), dominant.Origin.Y, RunsOf(spans)));
+                    lines.Add(new TextLineInfo(FromRect(line.Bbox), text, FormatOf(dominant, page), dominant.Origin.Y, RunsOf(spans, page)));
                 }
                 if (lines.Count > 0) result.Add(new TextBlockInfo(page, FromRect(block.Bbox), lines));
             }
@@ -73,12 +73,12 @@ public sealed partial class MuPdfDocument
     }
 
     /// <summary>Tramos con formato propio de un renglón (null si todo el renglón tiene el mismo formato).</summary>
-    private static IReadOnlyList<TextRun>? RunsOf(List<Span> spans)
+    private IReadOnlyList<TextRun>? RunsOf(List<Span> spans, int page)
     {
         var runs = new List<TextRun>();
         foreach (var s in spans)
         {
-            var f = FormatOf(s);
+            var f = FormatOf(s, page);
             if (runs.Count > 0 && runs[^1].Format == f) runs[^1] = runs[^1] with { Text = runs[^1].Text + s.Text };
             else runs.Add(new TextRun(s.Text, f));
         }
@@ -88,12 +88,59 @@ public sealed partial class MuPdfDocument
         return runs.Where(r => r.Text.Length > 0).ToList();
     }
 
+    // Las fuentes Type3 (PDF generados desde páginas web) no dicen su peso: se deduce midiendo el grosor de sus trazos.
+    private readonly Dictionary<string, bool> _heavyType3 = [];
+    private const double HeavyStemRatio = 0.125; // grosor de trazo / tamaño: normal ≈ 0,08–0,115, negrita ≈ 0,13–0,17
+
+    private bool IsHeavyType3(Span span, int page)
+    {
+        var key = span.Font ?? "";
+        if (_heavyType3.TryGetValue(key, out var known)) return known;
+        if (span.Text.Count(char.IsLetter) < 4 || span.Size <= 0) return false; // muestra muy corta: se intentará con otro tramo
+        double stem = StemRatio(page, span);
+        if (double.IsNaN(stem)) return false;
+        return _heavyType3[key] = stem >= HeavyStemRatio;
+    }
+
+    /// <summary>Largo típico de los tramos oscuros de una fila de píxeles (≈ grosor de los trazos) sobre el tamaño de letra.</summary>
+    private double StemRatio(int page, Span span)
+    {
+        const int k = 4;
+        try
+        {
+            using var pix = _doc[page].GetPixmap(matrix: new Matrix(k, k), clip: span.Bbox, colorSpace: "gray");
+            var px = pix.SAMPLES;
+            int n = pix.N, w = pix.Width, h = pix.Height, stride = pix.Stride;
+            int bg = 0;
+            for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) bg = Math.Max(bg, px[y * stride + x * n]);
+            int rgb = span.Color;
+            double lum = 0.299 * ((rgb >> 16) & 255) + 0.587 * ((rgb >> 8) & 255) + 0.114 * (rgb & 255);
+            if (bg - lum < 40) return double.NaN; // texto casi del color del fondo: no se puede medir
+            double threshold = (bg + lum) / 2;
+            var runs = new List<int>();
+            for (int y = 0; y < h; y++)
+            {
+                int run = 0;
+                for (int x = 0; x <= w; x++)
+                {
+                    if (x < w && px[y * stride + x * n] < threshold) run++;
+                    else if (run > 0) { runs.Add(run); run = 0; }
+                }
+            }
+            if (runs.Count < 20) return double.NaN;
+            runs.Sort();
+            return runs[runs.Count / 2] / (double)k / span.Size;
+        }
+        catch { return double.NaN; }
+    }
+
     /// <summary>Deduce familia, negrita, cursiva y color de un tramo de texto.</summary>
-    private static TextFormat FormatOf(Span span)
+    private TextFormat FormatOf(Span span, int page)
     {
         var name = (span.Font ?? "").ToLowerInvariant();
         int flags = (int)span.Flags;
-        bool bold = (flags & 16) != 0 || name.Contains("bold") || name.Contains("black") || name.Contains("heavy");
+        bool bold = (flags & 16) != 0 || name.Contains("bold") || name.Contains("black") || name.Contains("heavy")
+            || (name.StartsWith("type3") && IsHeavyType3(span, page));
         bool italic = (flags & 2) != 0 || name.Contains("italic") || name.Contains("oblique");
         string family =
             (flags & 8) != 0 || name.Contains("cour") || name.Contains("mono") || name.Contains("consol") ? TextFormat.Mono
