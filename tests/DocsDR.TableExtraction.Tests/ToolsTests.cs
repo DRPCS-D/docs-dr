@@ -112,6 +112,107 @@ public class ToolsTests : IDisposable
         doc.Dispose();
     }
 
+    // ---------------- Fuente parecida a la original ----------------
+
+    private static string WinFont(string file) => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), file);
+
+    /// <summary>Página con un renglón escrito con una fuente de Windows (incrustada completa en el PDF de prueba).</summary>
+    private static string CreateWithFont(string fontFile, string text, bool subset = false)
+    {
+        var path = PdfFactory.TempPath("font");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        lock (MuPdfDocument.NativeLock)
+        {
+            var culture = CultureInfo.CurrentCulture;
+            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+            try
+            {
+                var d = new Document();
+                d.NewPage(width: 400, height: 300).InsertText(new Point(40, 100), text, fontSize: 16, fontName: "F0", fontFile: fontFile);
+                if (subset) d.SubsetFonts();
+                d.Save(path);
+                d.Close();
+            }
+            finally { CultureInfo.CurrentCulture = culture; }
+        }
+        return path;
+    }
+
+    private static TextLineInfo Rewrite(IPdfEditor ed, string newText, Func<TextFormat, TextFormat>? tweak = null)
+    {
+        var line = ed.GetTextBlocks(0).SelectMany(b => b.Lines).Single();
+        var fmt = tweak?.Invoke(line.Format) ?? line.Format;
+        var erase = new PdfRect(line.Box.X0, Math.Max(line.Box.Y0 + 1.5, line.Baseline - 0.72 * line.Format.Size), line.Box.X1, Math.Min(line.Box.Y1 - 1.5, line.Baseline));
+        var place = new PdfRect(line.Box.X0, line.Box.Y0 - 0.5, line.Box.X1 + 150, line.Box.Y1 + 4);
+        ed.ReplaceText(0, erase, place, newText, fmt, TextAlign.Left, 0, line.Baseline, [new TextRun(newText, fmt)]);
+        return ed.GetTextBlocks(0).SelectMany(b => b.Lines).Single();
+    }
+
+    [Theory]
+    [InlineData("calibri.ttf", "Calibri")]     // se reconoce por nombre (equivalente instalada) y también está incrustada
+    [InlineData("bahnschrift.ttf", "Bahnschrift")] // no está en la tabla: solo se conserva reutilizando la incrustada
+    public void An_edited_line_keeps_its_original_font_instead_of_falling_back_to_arial(string file, string expected)
+    {
+        if (!File.Exists(WinFont(file))) return;
+        var (doc, ed) = Open(CreateWithFont(WinFont(file), "Presupuesto anual"));
+        var before = ed.GetTextBlocks(0).SelectMany(b => b.Lines).Single();
+        Assert.Contains(expected, before.Format.Face!.Name, StringComparison.OrdinalIgnoreCase);
+
+        var after = Rewrite(ed, "Presupuesto mensual");
+
+        Assert.Equal("Presupuesto mensual", after.Text);
+        Assert.Contains(expected, after.Format.Face!.Name, StringComparison.OrdinalIgnoreCase);
+        doc.Dispose();
+    }
+
+    [Fact]
+    public void A_subset_font_without_the_new_letters_falls_back_to_the_installed_equivalent()
+    {
+        var calibri = WinFont("calibri.ttf");
+        if (!File.Exists(calibri)) return;
+        // Solo se conservan las letras usadas («Hola»): «Zorro» no está en el subconjunto incrustado.
+        var (doc, ed) = Open(CreateWithFont(calibri, "Hola", subset: true));
+
+        var after = Rewrite(ed, "Zorro veloz");
+
+        Assert.Equal("Zorro veloz", after.Text);
+        Assert.Contains("Calibri", after.Format.Face!.Name, StringComparison.OrdinalIgnoreCase); // la instalada, no Arial
+        doc.Dispose();
+    }
+
+    [Fact]
+    public void Toggling_bold_on_a_known_font_uses_that_fonts_bold_variant()
+    {
+        if (!File.Exists(WinFont("calibri.ttf")) || !File.Exists(WinFont("calibrib.ttf"))) return;
+        var (doc, ed) = Open(CreateWithFont(WinFont("calibri.ttf"), "Presupuesto anual"));
+
+        var after = Rewrite(ed, "Presupuesto anual", f => f with { Bold = true });
+
+        Assert.True(after.Format.Bold);
+        Assert.Contains("Calibri", after.Format.Face!.Name, StringComparison.OrdinalIgnoreCase);
+        doc.Dispose();
+    }
+
+    [Theory]
+    [InlineData("georgia.ttf")]
+    [InlineData("calibri.ttf")]
+    public void An_edit_with_an_embedded_font_looks_the_same_on_screen_as_after_saving(string file)
+    {
+        if (!File.Exists(WinFont(file))) return;
+        var (doc, ed) = Open(CreateWithFont(WinFont(file), "Presupuesto anual"));
+        Rewrite(ed, "Zorro veloz total");
+
+        var onScreen = doc.Render(0, 2).Pixels.ToArray();
+        var saved = PdfFactory.TempPath("saved");
+        ed.Save(saved);
+        var reopened = new MuPdfService().Open(saved);
+
+        // MuPDF muestra una fuente de reemplazo si se renderiza en la misma sesión que la añadió: no debe ocurrir.
+        Assert.Equal(reopened.Render(0, 2).Pixels.ToArray(), onScreen);
+        reopened.Dispose();
+        doc.Dispose();
+    }
+
     [Fact]
     public void Ocr_reports_unavailable_data_instead_of_failing()
     {

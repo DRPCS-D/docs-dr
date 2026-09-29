@@ -32,8 +32,14 @@ public sealed record AnnotationInfo(
 
 public enum TextAlign { Left, Center, Right }
 
+/// <summary>
+/// Fuente original de un texto del PDF (nombre sin el prefijo de subconjunto, p. ej. «Calibri-Bold») y su estilo. Sirve para
+/// escribir el texto nuevo con la misma fuente (o una equivalente) en lugar de la familia genérica.
+/// </summary>
+public sealed record FontFace(string Name, bool Bold, bool Italic);
+
 /// <summary>Formato de un texto: familia (Arial, Times New Roman, Courier New), tamaño en puntos, color y estilo.</summary>
-public sealed record TextFormat(string Family, double Size, PdfColor Color, bool Bold, bool Italic)
+public sealed record TextFormat(string Family, double Size, PdfColor Color, bool Bold, bool Italic, FontFace? Face = null)
 {
     public const string Sans = "Arial", Serif = "Times New Roman", Mono = "Courier New";
     public static IReadOnlyList<string> Families { get; } = [Sans, Serif, Mono];

@@ -68,7 +68,7 @@ public sealed partial class MuPdfDocument
                     var dir = ToViewDirection(pg, line.Dir.X, line.Dir.Y);
                     if (dir.X < 0.98) continue;
                     var dominant = spans.OrderByDescending(s => s.Text.Length).First();
-                    var text = string.Concat(spans.Select(s => s.Text)).Trim();
+                    var text = string.Concat(spans.Select(s => Clean(s.Text))).Trim();
                     double baseline = ToViewPoint(pg, dominant.Origin).Y;
                     lines.Add(new TextLineInfo(ToView(pg, line.Bbox), text, FormatOf(dominant, page), baseline, RunsOf(spans, page)));
                 }
@@ -82,6 +82,9 @@ public sealed partial class MuPdfDocument
         return result;
     }
 
+    /// <summary>MuPDF escribe los espacios de una fuente TTF como U+00A0: se leen como espacios normales.</summary>
+    private static string Clean(string text) => text.Replace(' ', ' ');
+
     /// <summary>Tramos con formato propio de un renglón (null si todo el renglón tiene el mismo formato).</summary>
     private IReadOnlyList<TextRun>? RunsOf(List<Span> spans, int page)
     {
@@ -89,8 +92,8 @@ public sealed partial class MuPdfDocument
         foreach (var s in spans)
         {
             var f = FormatOf(s, page);
-            if (runs.Count > 0 && runs[^1].Format == f) runs[^1] = runs[^1] with { Text = runs[^1].Text + s.Text };
-            else runs.Add(new TextRun(s.Text, f));
+            if (runs.Count > 0 && runs[^1].Format == f) runs[^1] = runs[^1] with { Text = runs[^1].Text + Clean(s.Text) };
+            else runs.Add(new TextRun(Clean(s.Text), f));
         }
         if (runs.Count < 2) return null;
         runs[0] = runs[0] with { Text = runs[0].Text.TrimStart() };
@@ -161,7 +164,9 @@ public sealed partial class MuPdfDocument
             : TextFormat.Sans;
         int rgb = span.Color;
         var color = new PdfColor((byte)((rgb >> 16) & 0xFF), (byte)((rgb >> 8) & 0xFF), (byte)(rgb & 0xFF));
-        return new TextFormat(family, Math.Round(span.Size, 1), color, bold, italic);
+        // Las fuentes Type3 (PDF web) no tienen nombre útil ni se pueden reutilizar: solo cuenta la familia genérica.
+        FontFace? face = name.StartsWith("type3") || name.Length == 0 ? null : new FontFace(FontResolver.StripSubsetPrefix(span.Font!), bold, italic);
+        return new TextFormat(family, Math.Round(span.Size, 1), color, bold, italic, face);
     }
 
     public double ReplaceText(int page, PdfRect eraseBox, PdfRect placeBox, string text, TextFormat format, TextAlign align,
@@ -170,11 +175,12 @@ public sealed partial class MuPdfDocument
         lock (NativeLock)
         {
             using var _ = Invariant();
+            _fontFileUsed = false;
             double size = format.Size;
             if (runs is { Count: > 0 } && baseline is double line)
             {
                 // Se comprueba que quepa ANTES de borrar: si no cabe, el renglón original queda intacto.
-                var plan = PlanRuns(placeBox, runs);
+                var plan = PlanRuns(page, placeBox, runs);
                 EraseText(page, eraseBox);
                 size = DrawRuns(page, plan, align, line, placeBox);
             }
@@ -184,6 +190,7 @@ public sealed partial class MuPdfDocument
                 if (!string.IsNullOrWhiteSpace(text)) size = InsertFitted(page, placeBox, text, format, align, lineHeightFactor, baseline);
             }
             Invalidate();
+            ReloadIfFontFileUsed();
             return size;
         }
     }
@@ -193,8 +200,10 @@ public sealed partial class MuPdfDocument
         lock (NativeLock)
         {
             using var _ = Invariant();
+            _fontFileUsed = false;
             double size = InsertFitted(page, box, text, format, align, 0, null);
             Invalidate();
+            ReloadIfFontFileUsed();
             return size;
         }
     }
@@ -209,7 +218,7 @@ public sealed partial class MuPdfDocument
 
     private double InsertFitted(int page, PdfRect box, string text, TextFormat format, TextAlign align, double lineHeightFactor, double? baseline)
     {
-        var (fontFile, fontName) = FontResolver.Resolve(format, text);
+        var (fontFile, fontName) = ResolveFont(page, format, text);
         double size = format.Size;
         double min = format.Size * MinFontScale;
         while (true)
@@ -242,9 +251,9 @@ public sealed partial class MuPdfDocument
     private sealed record RunPlan(IReadOnlyList<TextRun> Runs, List<(string? File, string Name)> Fonts, double Scale, double Total);
 
     /// <summary>Elige las fuentes y la escala con que cabe un renglón de varios tramos en la caja; lanza si no cabe.</summary>
-    private RunPlan PlanRuns(PdfRect box, IReadOnlyList<TextRun> runs)
+    private RunPlan PlanRuns(int page, PdfRect box, IReadOnlyList<TextRun> runs)
     {
-        var fonts = runs.Select(r => FontResolver.Resolve(r.Format, r.Text)).ToList();
+        var fonts = runs.Select(r => ResolveFont(page, r.Format, r.Text)).ToList();
         double scale = 1;
         while (true)
         {
@@ -277,6 +286,91 @@ public sealed partial class MuPdfDocument
             x += TextWidth(plan.Fonts[i], plan.Runs[i].Text, size);
         }
         return Math.Round(plan.Runs.Max(r => r.Format.Size) * plan.Scale, 2);
+    }
+
+    // ---- Fuente incrustada en el propio PDF ----
+
+    private readonly Dictionary<int, EmbeddedFont?> _embedded = [];
+
+    private sealed record EmbeddedFont(string Path, string Name, MuPDF.NET.Font Font);
+
+    /// <summary>
+    /// Fuente con la que escribir <paramref name="text"/>: 1) la incrustada en el PDF si es la original y contiene todas las
+    /// letras nuevas; 2) una equivalente instalada; 3) la familia genérica.
+    /// </summary>
+    private (string? File, string Name) ResolveFont(int page, TextFormat format, string text)
+    {
+        (string? File, string Name) font;
+        if (format.Face is { } face && format.Bold == face.Bold && format.Italic == face.Italic
+            && TryEmbeddedFont(page, face, text) is { } emb)
+            font = (emb.Path, emb.Name);
+        else
+            font = FontResolver.Resolve(format, text);
+        if (font.File is not null) _fontFileUsed = true;
+        return font;
+    }
+
+    // Una fuente añadida desde archivo se ve con una fuente de reemplazo si se renderiza en la misma sesión de MuPDF que
+    // la añadió (guardada y reabierta se ve bien). Tras escribir con una, se recarga el documento en memoria.
+    private bool _fontFileUsed;
+
+    private void ReloadIfFontFileUsed()
+    {
+        if (!_fontFileUsed) return;
+        _fontFileUsed = false;
+        var bytes = _doc.Write(encryption: MuPDF.NET.Constants.PDF_ENCRYPT_KEEP);
+        var reloaded = OpenBytes(bytes, _password);
+        _doc.Close();
+        _doc = reloaded;
+        _embedded.Clear();
+        _heavyType3.Clear();
+        Invalidate();
+    }
+
+    private EmbeddedFont? TryEmbeddedFont(int page, FontFace face, string text)
+    {
+        try
+        {
+            int xref = 0;
+            foreach (var f in _doc[page].GetFonts(true))
+                if (SameFace(f.baseName ?? "", face.Name)) { xref = f.xref; break; }
+            if (xref == 0) return null;
+            if (!_embedded.TryGetValue(xref, out var font))
+            {
+                font = LoadEmbeddedFont(xref);
+                _embedded[xref] = font;
+            }
+            if (font is null) return null;
+            // Un subconjunto solo trae las letras que usaba el documento: se reutiliza únicamente si están todas las nuevas.
+            foreach (var c in text.Where(c => !char.IsWhiteSpace(c)).Distinct())
+                if (font.Font.HasGlyph(c) == 0) return null;
+            return font;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>¿Es la misma fuente? «ABCDEF+Calibri Regular», «Calibri-Regular» y «Calibri» cuentan como la misma; «Calibri-Bold» no.</summary>
+    private static bool SameFace(string embeddedName, string spanFont)
+    {
+        static string Norm(string n) => new string(FontResolver.StripSubsetPrefix(n).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        string a = Norm(embeddedName), b = Norm(spanFont);
+        if (a == b) return true;
+        foreach (var plain in new[] { "regular", "normal", "roman", "book", "mt", "ps" })
+            if (a == b + plain || b == a + plain) return true;
+        return false;
+    }
+
+    private EmbeddedFont? LoadEmbeddedFont(int xref)
+    {
+        var (name, ext, type, buffer) = _doc.ExtractFont(xref);
+        if (buffer is null || buffer.Length == 0 || ext is null or "n/a" || type is "Type3") return null;
+        var mf = new MuPDF.NET.Font(fontBuffer: buffer);
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(buffer))[..12];
+        var folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "DocsDR-fonts");
+        Directory.CreateDirectory(folder);
+        var path = System.IO.Path.Combine(folder, hash + "." + ext);
+        if (!File.Exists(path)) File.WriteAllBytes(path, buffer);
+        return new EmbeddedFont(path, "DRE" + hash, mf);
     }
 
     private static double TextWidth((string? File, string Name) font, string text, double size)

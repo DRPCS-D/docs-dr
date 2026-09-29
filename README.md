@@ -62,7 +62,9 @@ Las funciones están agrupadas en pestañas: **Inicio** (abrir, guardar, imprimi
 - **＋ Texto**: escribe un texto nuevo en cualquier punto de la página (`Ctrl+Intro` aplica).
 - **Editar imagen**: clic para seleccionar (contorno y asas), arrastrar para mover, arrastrar una esquina para redimensionar (mantiene proporciones), `Supr` para eliminar, *Reemplazar imagen…* para cambiarla. **＋ Imagen** inserta una nueva.
 
-Limitaciones: la fuente original se sustituye por la equivalente (Arial, Times New Roman o Courier New); un renglón con formatos mezclados conserva los de lo que no se toca; en PDF con fuentes Type3 la negrita se deduce midiendo el grosor del trazo; el texto que no cabe reduce el tamaño hasta un 60 %; no se edita en páginas giradas ni en escaneadas (sin texto); mover o quitar una imagen quita cualquier imagen que toque su caja.
+Fuentes: al editar, el texto se escribe con la fuente original si está incrustada en el PDF y contiene las letras nuevas; si no, con una equivalente instalada en Windows (Calibri, Segoe UI, Verdana, Georgia, Tahoma, Trebuchet, Consolas, Palatino…); si tampoco, con la familia genérica (Arial, Times New Roman o Courier New). Los PDF web con fuentes Type3 no permiten reutilizar la fuente (se usa la familia genérica, y la negrita se deduce midiendo el trazo). Páginas giradas: se puede editar texto e imágenes y crear anotaciones; el texto que se ve de lado (documento girado a mano) no es editable hasta girar la página de vuelta.
+
+Limitaciones: un renglón con formatos mezclados conserva los de lo que no se toca; el texto que no cabe reduce el tamaño hasta un 60 %; no se edita en páginas escaneadas (sin texto; use antes «Hacer PDF buscable»); al mover o quitar una imagen, las demás imágenes que toquen su caja se conservan pero quedan por encima del resto de la página.
 
 Nota técnica: MuPDF.NET escribe los números del contenido con la cultura del sistema, lo que corrompe colores y posiciones con decimales en configuraciones con coma decimal; todas las operaciones de escritura se ejecutan con cultura invariante (`MuPdfContentEditor.cs`).
 

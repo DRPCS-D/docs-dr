@@ -119,8 +119,13 @@ public sealed partial class DocumentViewModel
         set => TextAlignment = (TextAlign)Math.Clamp(value, 0, 2);
     }
 
+    // Fuente original del texto que se edita: se conserva mientras no se cambie la familia en la barra.
+    private FontFace? _face;
+    private string? _faceFamily;
+
     private TextFormat CurrentFormat =>
-        new(TextFamily, TextSize, (TextColor ?? ColorOption.All[^1]).Value, TextBold, TextItalic);
+        new(TextFamily, TextSize, (TextColor ?? ColorOption.All[^1]).Value, TextBold, TextItalic,
+            TextFamily == _faceFamily ? _face : null);
 
     /// <summary>Carga en los controles el formato del texto que se va a editar, para que el usuario lo ajuste.</summary>
     private void ApplyFormat(TextFormat f)
@@ -131,6 +136,8 @@ public sealed partial class DocumentViewModel
             while (at < TextSizes.Count && TextSizes[at] < f.Size) at++;
             TextSizes.Insert(at, f.Size);
         }
+        _face = f.Face;
+        _faceFamily = f.Family;
         TextFamily = f.Family;
         TextSize = f.Size;
         TextBold = f.Bold;
@@ -191,6 +198,8 @@ public sealed partial class DocumentViewModel
         SelectAnnotation(null);
         SelectImage(null);
         ClearSelection();
+        _face = null; // el texto nuevo usa la familia elegida en la barra, no la fuente de la edición anterior
+        _faceFamily = null;
         // La alineacion que dejo una edicion anterior (p. ej. la automatica de una cifra) no debe pasar al texto nuevo.
         TextAlignment = TextAlign.Left;
         var box = new PdfRect(pt.X, pt.Y, Math.Min(page.PageWidth - 10, pt.X + 240), pt.Y + TextSize * 1.8);
