@@ -91,3 +91,9 @@ powershell -File scripts/get-tessdata.ps1
 - `DocsDR.TableExtraction`: detectores, unión multipágina, limpieza.
 - `DocsDR.Excel`: exportación XLSX/CSV.
 - `DocsDR.App`: WPF (visor y ventana del convertidor).
+
+## Licencia
+
+DOCS-DR © 2026 DRPCS E.A.S. (autor: Diago Rene Ruiz Diaz Rios). Se distribuye bajo la licencia
+[GNU AGPL-3.0](LICENSE), la misma de MuPDF, que la aplicación incluye. Las licencias de las demás
+librerías aparecen en *Ayuda › Acerca de*.
