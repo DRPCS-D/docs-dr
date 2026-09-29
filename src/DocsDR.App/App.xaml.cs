@@ -17,6 +17,10 @@ public partial class App : Application
 
     public static IServiceProvider Services { get; private set; } = null!;
 
+    // El tema debe fijarse antes de InitializeComponent (que carga los estilos de App.xaml): si se cambia después,
+    // los estilos de los botones quedan basados en el tema clásico y se ven grises claros.
+    public App() => ApplyTheme(new SettingsService().Theme);
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -34,8 +38,6 @@ public partial class App : Application
             .AddSingleton<MainViewModel>()
             .AddTransient<MainWindow>()
             .BuildServiceProvider();
-
-        ApplyTheme(Services.GetRequiredService<SettingsService>().Theme);
 
         var window = Services.GetRequiredService<MainWindow>();
         MainWindow = window;
