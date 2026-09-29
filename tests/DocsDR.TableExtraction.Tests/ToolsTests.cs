@@ -109,6 +109,39 @@ public class ToolsTests : IDisposable
     }
 
     [Fact]
+    public void Ocr_end_to_end_recognizes_a_scanned_page_and_makes_it_searchable()
+    {
+        // Se necesitan los datos de idioma (scripts/get-tessdata.ps1); sin ellos la prueba no aplica.
+        if (TessdataLocator.Find() is null) return;
+
+        // «Escaneado»: una página con texto grande, convertida en imagen y guardada como PDF de solo imagen.
+        var text = Create(p =>
+        {
+            p.InsertText(new Point(40, 100), "Factura numero cuarenta", fontSize: 22, fontName: "helv");
+            p.InsertText(new Point(40, 140), "Cliente almacen general", fontSize: 22, fontName: "helv");
+        });
+        var src = new MuPdfService().Open(text);
+        var r = src.Render(0, 200 / 72.0);
+        var raw = new byte[r.Width * r.Height * 3];
+        for (int y = 0; y < r.Height; y++) Buffer.BlockCopy(r.Pixels, y * r.Stride, raw, y * r.Width * 3, r.Width * 3);
+        var dir = Path.GetDirectoryName(PdfFactory.TempPath("ocr"))!;
+        var png = Path.Combine(dir, Guid.NewGuid().ToString("N") + ".png");
+        lock (MuPdfDocument.NativeLock) new Pixmap(new Colorspace(Utils.CS_RGB), r.Width, r.Height, raw, false).Save(png);
+        var scan = Path.Combine(dir, Guid.NewGuid().ToString("N") + ".pdf");
+        new MuPdfService().ImagesToPdf([png], scan);
+
+        var (doc, ed) = Open(scan);
+        Assert.Empty(doc.GetWords(0));
+        Assert.True(ed.NeedsOcr(0));
+        var words = ed.RecognizePage(0)!;
+        ed.AddInvisibleText(0, words);
+
+        Assert.NotEmpty(doc.Search("cuarenta"));
+        Assert.NotEmpty(doc.Search("almacen"));
+        doc.Dispose();
+    }
+
+    [Fact]
     public void A_replacement_that_does_not_fit_leaves_the_original_line_untouched()
     {
         var path = Create(p => p.InsertText(new Point(40, 100), "Texto original", fontSize: 12, fontName: "helv"));
