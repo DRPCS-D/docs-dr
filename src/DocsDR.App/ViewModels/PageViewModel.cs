@@ -15,6 +15,7 @@ public sealed record HighlightBox(double Left, double Top, double Width, double 
 public sealed partial class PageViewModel : ObservableObject
 {
     public const double ThumbnailZoom = 0.2;
+    public const double GridThumbnailZoom = 0.4; // vista «Organizar páginas»: más nítida, se libera al salir de ella
     public const double HandleSize = 9;
 
     private readonly DocumentViewModel _owner;
@@ -133,6 +134,43 @@ public sealed partial class PageViewModel : ObservableObject
         }
     }
 
+    private ImageSource? _gridThumbnail;
+    private bool _gridRendering;
+
+    /// <summary>Miniatura grande para la cuadrícula de organizar páginas.</summary>
+    public ImageSource? GridThumbnail
+    {
+        get
+        {
+            if (_gridThumbnail is null && !_gridRendering) _ = RenderGridThumbAsync();
+            return _gridThumbnail ?? Thumbnail; // mientras llega la grande se muestra la pequeña
+        }
+    }
+
+    private async Task RenderGridThumbAsync()
+    {
+        _gridRendering = true;
+        int version = _renderVersion;
+        try
+        {
+            var bmp = await PageImages.RenderAsync(_owner.Document, Index, GridThumbnailZoom);
+            if (version != _renderVersion) return;
+            _gridThumbnail = bmp;
+            OnPropertyChanged(nameof(GridThumbnail));
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Error al renderizar la miniatura grande {Page}", Number);
+        }
+        finally
+        {
+            _gridRendering = false;
+            if (version != _renderVersion) OnPropertyChanged(nameof(GridThumbnail));
+        }
+    }
+
+    internal void ReleaseGridThumbnail() => _gridThumbnail = null;
+
     private async Task RenderAsync()
     {
         _rendering = true;
@@ -169,8 +207,10 @@ public sealed partial class PageViewModel : ObservableObject
         _imageZoom = -1;
         _words = null;
         _thumbnail = null;
+        _gridThumbnail = null;
         OnPropertyChanged(nameof(Image));
         OnPropertyChanged(nameof(Thumbnail));
+        OnPropertyChanged(nameof(GridThumbnail));
     }
 
     private async Task RenderThumbAsync()

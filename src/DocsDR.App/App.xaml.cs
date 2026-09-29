@@ -45,9 +45,29 @@ public partial class App : Application
 
         // Asociación de archivos / "Abrir con": la ruta llega como argumento; si no hay ninguno se reabre la sesión anterior.
         var vm = Services.GetRequiredService<MainViewModel>();
+        if (DefaultReader.InstalledExePath() is { } installed)
+        {
+            try { DefaultReader.Register(installed); }
+            catch (Exception ex) { Log.Warning(ex, "No se pudo registrar DOCS-DR como candidato para abrir PDF"); }
+        }
+        SingleInstance.Listen(paths => Dispatcher.BeginInvoke(() => OpenFromOtherInstance(window, vm, paths)), _stop.Token);
         var toOpen = e.Args.Where(a => a.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(a)).ToList();
         if (toOpen.Count == 0) vm.RestorePreviousSession();
         foreach (var arg in toOpen) vm.OpenPath(arg);
+    }
+
+    private readonly CancellationTokenSource _stop = new();
+
+    /// <summary>Otro arranque de la aplicación pasó rutas: se abren como pestañas y la ventana se trae al frente.</summary>
+    private static void OpenFromOtherInstance(Window window, MainViewModel vm, IReadOnlyList<string> paths)
+    {
+        foreach (var path in paths.Where(p => p.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(p)))
+            vm.OpenPath(path);
+        if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
+        window.Activate();
+        window.Topmost = true; // Windows no siempre deja pasar al frente a una ventana en segundo plano: se fuerza un instante
+        window.Topmost = false;
+        window.Focus();
     }
 
     /// <summary>Cambia entre el tema claro y el oscuro (también en las ventanas ya abiertas).</summary>
@@ -65,6 +85,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _stop.Cancel();
         Log.CloseAndFlush();
         base.OnExit(e);
     }

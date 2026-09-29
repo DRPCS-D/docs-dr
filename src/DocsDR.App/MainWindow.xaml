@@ -101,6 +101,7 @@
                 <MenuItem Header="_Reportar un error" Command="{Binding ReportIssueCommand}" />
                 <MenuItem Header="Sitio del _proyecto" Command="{Binding OpenRepositoryCommand}" />
                 <Separator />
+                <MenuItem Header="Establecer como lector de PDF pre_determinado…" Command="{Binding SetDefaultReaderCommand}" />
                 <MenuItem Header="_Acerca de DOCS-DR" InputGestureText="F1" Command="{Binding ShowAboutCommand}" />
             </MenuItem>
         </Menu>

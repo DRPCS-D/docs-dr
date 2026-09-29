@@ -1,3 +1,4 @@
+using DocsDR.App.Services;
 using Velopack;
 
 namespace DocsDR.App;
@@ -11,7 +12,14 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        VelopackApp.Build().Run();
+        VelopackApp.Build()
+            .OnBeforeUninstallFastCallback(_ => DefaultReader.Unregister())
+            .Run();
+
+        // Una sola ventana: abrir otro PDF desde el Explorador lo añade como pestaña a la ventana que ya está abierta.
+        if (!SingleInstance.TryBecomePrimary()
+            && SingleInstance.SendToPrimary(args.Where(a => a.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))))
+            return;
 
         var app = new App();
         app.InitializeComponent();

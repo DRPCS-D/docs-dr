@@ -23,6 +23,9 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
 
     [ObservableProperty] private string _statusText = "Listo";
 
+    /// <summary>La pestaña «Páginas» de la cinta está activa: los documentos muestran la cuadrícula de organizar páginas.</summary>
+    [ObservableProperty] private bool _isOrganizing;
+
     public bool HasDocument => SelectedDocument is not null;
 
     // ---- Tema claro / oscuro ----
@@ -31,6 +34,26 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
     private bool _isDarkTheme = settings.Theme != "Light";
 
     public bool IsLightTheme => !IsDarkTheme;
+
+    [RelayCommand]
+    private void SetDefaultReader()
+    {
+        if (DefaultReader.InstalledExePath() is not { } exe)
+        {
+            MessageBox.Show("Esta opción está disponible en la versión instalada de DOCS-DR (no en la portable ni en compilaciones de prueba).",
+                "Lector de PDF predeterminado", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try { DefaultReader.Register(exe); }
+        catch (Exception ex) { Serilog.Log.Warning(ex, "No se pudo registrar DOCS-DR para abrir PDF"); }
+
+        var answer = MessageBox.Show(
+            "Windows no permite que una aplicación se ponga como predeterminada por sí sola: lo eliges tú.\n\n" +
+            "Se abrirá «Aplicaciones predeterminadas». Elige DOCS-DR en la lista y pulsa «Establecer como predeterminada» " +
+            "(o busca «.pdf» y selecciona DOCS-DR).",
+            "Lector de PDF predeterminado", MessageBoxButton.OKCancel, MessageBoxImage.Information);
+        if (answer == MessageBoxResult.OK) DefaultReader.OpenWindowsSettings();
+    }
 
     [RelayCommand]
     private void SetTheme(string theme)

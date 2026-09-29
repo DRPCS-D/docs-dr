@@ -29,6 +29,7 @@
                          PreviewMouseMove="OnThumbnailMouseMove"
                          PreviewMouseLeftButtonUp="OnThumbnailClick"
                          DragOver="OnThumbnailDragOver"
+                         DragLeave="OnThumbnailDragLeave"
                          Drop="OnThumbnailDrop">
                     <ListBox.ContextMenu>
                         <ContextMenu>
@@ -253,5 +254,72 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- Organizar páginas: cuadrícula que cubre el visor mientras la pestaña «Páginas» de la cinta está activa -->
+        <Grid x:Name="OrganizeHost" Grid.ColumnSpan="3" Background="{StaticResource ViewerBackground}"
+              Visibility="{Binding DataContext.IsOrganizing, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"
+              IsVisibleChanged="OnOrganizeVisibleChanged">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <ListBox x:Name="OrganizeGrid" ItemsSource="{Binding Pages}"
+                     SelectionMode="Extended" AllowDrop="True" BorderThickness="0" Background="Transparent"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.CanContentScroll="False"
+                     SelectionChanged="OnOrganizeSelectionChanged"
+                     PreviewMouseLeftButtonDown="OnThumbnailMouseDown"
+                     PreviewMouseMove="OnThumbnailMouseMove"
+                     MouseDoubleClick="OnOrganizeDoubleClick"
+                     PreviewKeyDown="OnOrganizeKeyDown"
+                     DragOver="OnThumbnailDragOver"
+                     DragLeave="OnThumbnailDragLeave"
+                     Drop="OnThumbnailDrop">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Margin="12" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Rotar a la izquierda" Command="{Binding RotateLeftCommand}" />
+                        <MenuItem Header="Rotar a la derecha" Command="{Binding RotateRightCommand}" />
+                        <MenuItem Header="Duplicar" Command="{Binding DuplicatePagesCommand}" />
+                        <Separator />
+                        <MenuItem Header="Insertar página en blanco" Command="{Binding InsertBlankPageCommand}" />
+                        <MenuItem Header="Insertar desde PDF…" Command="{Binding InsertFromPdfCommand}" />
+                        <MenuItem Header="Extraer páginas…" Command="{Binding ExtractPagesCommand}" />
+                        <Separator />
+                        <MenuItem Header="Eliminar páginas" InputGestureText="Supr" Command="{Binding DeletePagesCommand}" />
+                    </ContextMenu>
+                </ListBox.ContextMenu>
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:PageViewModel}">
+                        <Grid Width="{Binding DataContext.GridCellWidth, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                              Height="{Binding DataContext.GridCellHeight, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                              Background="Transparent">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Viewbox Margin="6,6,6,2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Stretch="Uniform">
+                                <Border Width="{Binding PageWidth}" Height="{Binding PageHeight}" Background="White">
+                                    <Image Source="{Binding GridThumbnail}" Stretch="Fill" />
+                                </Border>
+                            </Viewbox>
+                            <TextBlock Grid.Row="1" Text="{Binding Number}" HorizontalAlignment="Center" Margin="0,2,0,4" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <DockPanel Grid.Row="1" Margin="12,6">
+                <Slider DockPanel.Dock="Right" Width="150" VerticalAlignment="Center"
+                        Minimum="90" Maximum="320" SmallChange="10" LargeChange="40"
+                        Value="{Binding GridThumbSize}" ToolTip="Tamaño de las miniaturas" />
+                <TextBlock DockPanel.Dock="Right" Text="Miniaturas" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.7" />
+                <TextBlock VerticalAlignment="Center" Opacity="0.7" TextTrimming="CharacterEllipsis"
+                           Text="Arrastra para mover · Ctrl + arrastrar para duplicar · Suelta un PDF para insertarlo · Doble clic para abrir la página" />
+            </DockPanel>
+        </Grid>
     </Grid>
 </UserControl>

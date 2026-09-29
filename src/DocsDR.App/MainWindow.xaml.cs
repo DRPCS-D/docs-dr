@@ -38,7 +38,12 @@ public partial class MainWindow : Window
         // Los cuadros combinados y demás controles de dentro también elevan este evento; solo importa la cinta.
         if (!ReferenceEquals(e.OriginalSource, Ribbon)) return;
         if (_vm.SelectedDocument is { } doc) doc.Tool = AnnotTool.Select;
+        // La pestaña «Páginas» muestra la cuadrícula de organizar páginas en lugar del visor.
+        _vm.IsOrganizing = Ribbon.SelectedItem is TabItem { Header: "Páginas" };
     }
+
+    /// <summary>Vuelve del modo organizar al visor (pestaña Inicio de la cinta).</summary>
+    public void ShowViewer() => Ribbon.SelectedIndex = 0;
 
     /// <summary>Antes de cerrar la app se ofrece guardar los documentos con cambios.</summary>
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)

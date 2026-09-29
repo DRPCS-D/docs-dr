@@ -55,6 +55,8 @@ Las funciones están agrupadas en pestañas: **Inicio** (abrir, guardar, imprimi
 - **Exportar páginas como imágenes** (Archivo, pestaña Páginas): PNG o JPEG a 72–300 ppp, todas las páginas, las elegidas o un rango. Nunca pisa archivos existentes.
 - **Crear PDF desde imágenes** (Archivo, pestaña Páginas): una imagen por página, en el orden que elijas; hoja A4 vertical u horizontal según la imagen.
 - **Reducir tamaño del archivo** (Archivo › Reducir tamaño del archivo…, o pestaña Convertir): crea una copia más liviana sin tocar el documento abierto. Tres niveles: sin pérdida (limpia y comprime), equilibrada (imágenes a 150 ppp) y máxima (96 ppp). Muestra el tamaño antes y después; si no se logra reducir, no guarda nada.
+- **Organizar páginas**: al abrir la pestaña Páginas de la cinta, las páginas se muestran en una cuadrícula. Arrastra para mover (una línea azul marca el destino), Ctrl + arrastrar para duplicar, suelta un PDF para insertar sus páginas; gira, elimina o extrae las marcadas. Doble clic abre la página en el visor.
+- **Lector de PDF predeterminado**: la versión instalada se registra en Windows como candidata para abrir `.pdf` (Ayuda › Establecer como lector de PDF predeterminado… abre la pantalla de Windows donde se elige). Abrir otro PDF añade una pestaña a la ventana ya abierta.
 - **Recordar la vista**: al cerrar se guardan la posición y el tamaño de la ventana y los documentos abiertos (con página y zoom); se reabren al iniciar. Se desactiva en Ver › Reabrir documentos al iniciar.
 
 ## Edición del contenido (fase 4, pestaña *Edición*)

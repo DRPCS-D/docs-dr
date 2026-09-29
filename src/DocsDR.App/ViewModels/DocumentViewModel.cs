@@ -707,10 +707,10 @@ public sealed partial class DocumentViewModel : ObservableObject, IDisposable
         pages.Count == 1 ? $"la página {pages[0] + 1}" : $"{pages.Count} páginas";
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
-    private void RotateLeft() => Edit(ed => ed.RotatePages(TargetPages, -90), structural: true);
+    private void RotateLeft() => RotateSelected(-90);
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
-    private void RotateRight() => Edit(ed => ed.RotatePages(TargetPages, 90), structural: true);
+    private void RotateRight() => RotateSelected(90);
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
     private void DeletePages()
@@ -803,20 +803,6 @@ public sealed partial class DocumentViewModel : ObservableObject, IDisposable
             MessageBox.Show($"Se crearon {groups.Count} archivo(s) en:\n{dlg.FolderName}", "Dividir documento", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) { ShowError("No se pudo dividir", ex); }
-    }
-
-    /// <summary>Mueve las páginas indicadas junto a la página <paramref name="target"/> (arrastrar y soltar).</summary>
-    public void MovePages(IReadOnlyList<int> moving, int target)
-    {
-        var set = moving.ToHashSet();
-        if (set.Count == 0 || set.Contains(target)) return;
-        var rest = Enumerable.Range(0, Pages.Count).Where(i => !set.Contains(i)).ToList();
-        int pos = rest.IndexOf(target);
-        // Hacia arriba se coloca antes de la página destino; hacia abajo, después.
-        if (target > moving.Min()) pos++;
-        var order = rest.Take(pos).Concat(moving.Order()).Concat(rest.Skip(pos)).ToList();
-        if (Edit(ed => ed.ReorderPages(order), structural: true))
-            GoToPage(order.IndexOf(moving.Min()));
     }
 
     private static void ShowError(string message, Exception ex)

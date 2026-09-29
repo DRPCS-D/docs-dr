@@ -77,6 +77,7 @@ public partial class DocumentView : UserControl
         {
             _vm.ScrollRequested -= OnScrollRequested;
             _vm.PropertyChanged -= OnVmPropertyChanged;
+            _vm.PagesSelectionRequested -= OnPagesSelectionRequested;
         }
         CloseTextEditor();
         _vm = vm;
@@ -84,6 +85,7 @@ public partial class DocumentView : UserControl
         {
             _vm.ScrollRequested += OnScrollRequested;
             _vm.PropertyChanged += OnVmPropertyChanged;
+            _vm.PagesSelectionRequested += OnPagesSelectionRequested;
             if (IsLoaded) ApplyPendingPage();
         }
     }
@@ -141,58 +143,263 @@ public partial class DocumentView : UserControl
     }
 
     // ================= Miniaturas: selección, navegación y reordenar =================
+    // Sirven a dos listas: el panel lateral (una columna) y la cuadrícula de «Organizar páginas».
 
-    private ListBoxItem? ItemAt(object? source) =>
-        source is DependencyObject d ? ItemsControl.ContainerFromElement(Thumbnails, d) as ListBoxItem : null;
+    private bool IsGrid(ListBox list) => ReferenceEquals(list, OrganizeGrid);
 
-    private void OnThumbnailSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private static ListBoxItem? ItemAt(ListBox list, object? source) =>
+        source is DependencyObject d ? ItemsControl.ContainerFromElement(list, d) as ListBoxItem : null;
+
+    private bool _syncingSelection;
+
+    private void OnThumbnailSelectionChanged(object sender, SelectionChangedEventArgs e) => SyncSelection(Thumbnails, OrganizeGrid);
+
+    private void OnOrganizeSelectionChanged(object sender, SelectionChangedEventArgs e) => SyncSelection(OrganizeGrid, Thumbnails);
+
+    /// <summary>Guarda las páginas marcadas en la lista activa y las refleja en la otra.</summary>
+    private void SyncSelection(ListBox from, ListBox to)
     {
-        if (_vm is null) return;
-        _vm.SelectedPageIndexes = Thumbnails.SelectedItems.OfType<PageViewModel>().Select(p => p.Index).Order().ToList();
+        if (_vm is null || _syncingSelection) return;
+        var picked = from.SelectedItems.OfType<PageViewModel>().ToList();
+        _vm.SelectedPageIndexes = picked.Select(p => p.Index).Order().ToList();
+        _syncingSelection = true;
+        try
+        {
+            to.SelectedItems.Clear();
+            foreach (var p in picked) to.SelectedItems.Add(p);
+        }
+        finally { _syncingSelection = false; }
+    }
+
+    /// <summary>Tras mover, duplicar o girar la lista se reconstruye: se vuelven a marcar las páginas afectadas.</summary>
+    private void OnPagesSelectionRequested(IReadOnlyList<int> pages)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_vm is null) return;
+            _syncingSelection = true;
+            try
+            {
+                foreach (var list in new[] { Thumbnails, OrganizeGrid })
+                {
+                    list.SelectedItems.Clear();
+                    foreach (var i in pages.Where(i => i >= 0 && i < _vm.Pages.Count)) list.SelectedItems.Add(_vm.Pages[i]);
+                }
+            }
+            finally { _syncingSelection = false; }
+            _vm.SelectedPageIndexes = pages.Order().ToList();
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void OnThumbnailClick(object sender, MouseButtonEventArgs e)
     {
         // Con Ctrl/Mayús se está armando una selección múltiple: no se navega.
         if (Keyboard.Modifiers != ModifierKeys.None) return;
-        if (ItemAt(e.OriginalSource)?.DataContext is PageViewModel p) _vm?.GoToPage(p.Index);
+        if (ItemAt(Thumbnails, e.OriginalSource)?.DataContext is PageViewModel p) _vm?.GoToPage(p.Index);
+    }
+
+    private void OnOrganizeDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ItemAt(OrganizeGrid, e.OriginalSource)?.DataContext is not PageViewModel p) return;
+        _vm?.GoToPage(p.Index);
+        (Window.GetWindow(this) as MainWindow)?.ShowViewer();
+        e.Handled = true;
+    }
+
+    private void OnOrganizeKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete && _vm?.DeletePagesCommand.CanExecute(null) == true)
+        {
+            _vm.DeletePagesCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void OnOrganizeVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is false) _vm?.ReleaseGridThumbnails();
     }
 
     private void OnThumbnailMouseDown(object sender, MouseButtonEventArgs e)
     {
-        _thumbStart = e.GetPosition(Thumbnails);
-        _thumbDragArmed = ItemAt(e.OriginalSource) is not null;
+        var list = (ListBox)sender;
+        _thumbStart = e.GetPosition(list);
+        _thumbDragArmed = ItemAt(list, e.OriginalSource) is not null;
     }
 
     private void OnThumbnailMouseMove(object sender, MouseEventArgs e)
     {
+        var list = (ListBox)sender;
         if (!_thumbDragArmed || e.LeftButton != MouseButtonState.Pressed || _vm is not { CanEdit: true }) return;
-        var d = e.GetPosition(Thumbnails) - _thumbStart;
+        var d = e.GetPosition(list) - _thumbStart;
         if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance) return;
 
         _thumbDragArmed = false;
-        if (ItemAt(e.OriginalSource)?.DataContext is not PageViewModel page) return;
+        if (ItemAt(list, e.OriginalSource)?.DataContext is not PageViewModel page) return;
         // Arrastrar una página que no estaba seleccionada mueve solo esa.
-        var indexes = Thumbnails.SelectedItems.Contains(page)
-            ? Thumbnails.SelectedItems.OfType<PageViewModel>().Select(p => p.Index).ToArray()
+        var indexes = list.SelectedItems.Contains(page)
+            ? list.SelectedItems.OfType<PageViewModel>().Select(p => p.Index).ToArray()
             : [page.Index];
-        DragDrop.DoDragDrop(Thumbnails, new DataObject(PagesFormat, indexes), DragDropEffects.Move);
+        DragDrop.DoDragDrop(list, new DataObject(PagesFormat, indexes), DragDropEffects.Move | DragDropEffects.Copy);
+        HideDropLine();
     }
+
+    private static string[] DroppedPdfs(DragEventArgs e) =>
+        e.Data.GetData(DataFormats.FileDrop) is string[] files
+            ? files.Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)).ToArray()
+            : [];
+
+    private static bool CtrlHeld(DragEventArgs e) => e.KeyStates.HasFlag(DragDropKeyStates.ControlKey);
 
     private void OnThumbnailDragOver(object sender, DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(PagesFormat)) return; // archivos: los gestiona la ventana principal
-        e.Effects = DragDropEffects.Move;
-        e.Handled = true;
+        var list = (ListBox)sender;
+        if (_vm is null) return;
+
+        if (e.Data.GetData(PagesFormat) is int[] indexes)
+        {
+            bool copy = CtrlHeld(e);
+            e.Effects = copy ? DragDropEffects.Copy : DragDropEffects.Move;
+            e.Handled = true;
+            int gap = DropGap(list, e, out var line);
+            if (!copy && _vm.IsNoOpMove(indexes, gap)) HideDropLine();
+            else ShowDropLine(list, line);
+        }
+        else if (DroppedPdfs(e).Length > 0)
+        {
+            // Un PDF soltado sobre las miniaturas se inserta en ese punto (fuera de ellas la ventana lo abre en una pestaña).
+            e.Effects = DragDropEffects.Copy;
+            e.Handled = true;
+            DropGap(list, e, out var line);
+            ShowDropLine(list, line);
+        }
+        else return;
+        AutoScrollThumbnails(list, e.GetPosition(list));
     }
+
+    private void OnThumbnailDragLeave(object sender, DragEventArgs e) => HideDropLine();
 
     private void OnThumbnailDrop(object sender, DragEventArgs e)
     {
-        if (_vm is null || e.Data.GetData(PagesFormat) is not int[] indexes) return;
-        // Soltar en el espacio vacío mueve las páginas al final.
-        int target = ItemAt(e.OriginalSource)?.DataContext is PageViewModel p ? p.Index : _vm.Pages.Count - 1;
-        _vm.MovePages(indexes, target);
-        e.Handled = true;
+        var list = (ListBox)sender;
+        HideDropLine();
+        if (_vm is null) return;
+        if (e.Data.GetData(PagesFormat) is int[] indexes)
+        {
+            int gap = DropGap(list, e, out _);
+            if (CtrlHeld(e)) _vm.DuplicatePagesToGap(indexes, gap);
+            else _vm.MovePagesToGap(indexes, gap);
+            e.Handled = true;
+        }
+        else if (DroppedPdfs(e) is { Length: > 0 } pdfs)
+        {
+            _vm.InsertPdfFilesAtGap(pdfs, DropGap(list, e, out _));
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Hueco de destino (0 = antes de la primera página, Count = tras la última) y la línea que lo marca, en coordenadas de la
+    /// lista. Se decide por la miniatura más cercana al cursor y por qué mitad de ella se apunta.
+    /// </summary>
+    private int DropGap(ListBox list, DragEventArgs e, out Rect line)
+    {
+        line = Rect.Empty;
+        int count = list.Items.Count;
+        if (count == 0) return 0;
+
+        var mouse = e.GetPosition(list);
+        ListBoxItem? best = null;
+        double bestDist = double.MaxValue;
+        for (int i = 0; i < count; i++)
+        {
+            if (list.ItemContainerGenerator.ContainerFromIndex(i) is not ListBoxItem c || c.ActualWidth == 0) continue;
+            var r = new Rect(c.TranslatePoint(new Point(0, 0), list), new Size(c.ActualWidth, c.ActualHeight));
+            double dx = Math.Max(Math.Max(r.Left - mouse.X, 0), mouse.X - r.Right);
+            double dy = Math.Max(Math.Max(r.Top - mouse.Y, 0), mouse.Y - r.Bottom);
+            double dist = dx * dx + dy * dy;
+            if (dist < bestDist) { bestDist = dist; best = c; }
+        }
+        if (best?.DataContext is not PageViewModel page) return count;
+
+        var box = new Rect(best.TranslatePoint(new Point(0, 0), list), new Size(best.ActualWidth, best.ActualHeight));
+        bool grid = IsGrid(list);
+        bool before = grid ? mouse.X < box.Left + box.Width / 2 : mouse.Y < box.Top + box.Height / 2;
+        const double thickness = 3;
+        if (grid)
+        {
+            double x = before ? box.Left : box.Right;
+            line = new Rect(x - thickness / 2, box.Top + 2, thickness, Math.Max(0, box.Height - 4));
+        }
+        else
+        {
+            double y = before ? box.Top : box.Bottom;
+            line = new Rect(4, y - thickness / 2, Math.Max(0, list.ActualWidth - 8), thickness);
+        }
+        return page.Index + (before ? 0 : 1);
+    }
+
+    // Indicador de destino: una línea (horizontal en el panel lateral, vertical en la cuadrícula) entre miniaturas.
+    private sealed class DropLineAdorner(UIElement target) : System.Windows.Documents.Adorner(target)
+    {
+        public Rect Line { get; set; }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            if (Line.IsEmpty) return;
+            var brush = SystemColors.HighlightBrush;
+            dc.DrawRectangle(brush, null, Line);
+            // Tiradores en los extremos para que se vea aun sobre miniaturas blancas.
+            bool vertical = Line.Height > Line.Width;
+            var a = vertical ? new Point(Line.Left + Line.Width / 2, Line.Top + 3) : new Point(Line.Left + 3, Line.Top + Line.Height / 2);
+            var b = vertical ? new Point(Line.Left + Line.Width / 2, Line.Bottom - 3) : new Point(Line.Right - 3, Line.Top + Line.Height / 2);
+            dc.DrawEllipse(brush, null, a, 4, 4);
+            dc.DrawEllipse(brush, null, b, 4, 4);
+        }
+    }
+
+    private DropLineAdorner? _dropLine;
+    private ListBox? _dropList;
+
+    private void ShowDropLine(ListBox list, Rect line)
+    {
+        if (line.IsEmpty) { HideDropLine(); return; }
+        if (_dropLine is not null && !ReferenceEquals(_dropList, list)) HideDropLine();
+        var layer = System.Windows.Documents.AdornerLayer.GetAdornerLayer(list);
+        if (layer is null) return;
+        if (_dropLine is null)
+        {
+            _dropLine = new DropLineAdorner(list) { IsHitTestVisible = false };
+            _dropList = list;
+            layer.Add(_dropLine);
+        }
+        _dropLine.Line = line;
+        _dropLine.InvalidateVisual();
+    }
+
+    private void HideDropLine()
+    {
+        if (_dropLine is null) return;
+        if (_dropList is not null) System.Windows.Documents.AdornerLayer.GetAdornerLayer(_dropList)?.Remove(_dropLine);
+        _dropLine = null;
+        _dropList = null;
+    }
+
+    /// <summary>Desplaza la lista cuando se arrastra cerca del borde superior o inferior.</summary>
+    private static void AutoScrollThumbnails(ListBox list, Point p)
+    {
+        const double edge = 36, step = 18;
+        if (FindScrollViewer(list) is not { } sv) return;
+        if (p.Y < edge) sv.ScrollToVerticalOffset(sv.VerticalOffset - step);
+        else if (p.Y > list.ActualHeight - edge) sv.ScrollToVerticalOffset(sv.VerticalOffset + step);
+    }
+
+    private static ScrollViewer? FindScrollViewer(DependencyObject d)
+    {
+        if (d is ScrollViewer s) return s;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++)
+            if (FindScrollViewer(VisualTreeHelper.GetChild(d, i)) is { } r) return r;
+        return null;
     }
 
     // ================= Ratón sobre la página =================

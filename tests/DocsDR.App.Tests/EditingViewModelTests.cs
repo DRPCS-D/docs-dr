@@ -108,6 +108,31 @@ public class EditingViewModelTests
     }
 
     [Fact]
+    public void Organize_grid_moves_and_duplicates_pages_at_a_gap()
+    {
+        var (vm, _) = Open(3); // anchos 200, 210, 220
+
+        Assert.True(vm.IsNoOpMove([1], 1));  // antes de sí misma
+        Assert.True(vm.IsNoOpMove([1], 2));  // justo después de sí misma
+        Assert.False(vm.IsNoOpMove([1], 3));
+
+        vm.MovePagesToGap([0], 3); // al final
+        Assert.Equal([210, 220, 200], Widths(vm));
+        vm.MovePagesToGap([1, 2], 0); // dos páginas al principio, en su orden
+        Assert.Equal([220, 200, 210], Widths(vm));
+        Assert.Equal([0, 1], vm.SelectedPageIndexes);
+
+        vm.DuplicatePagesToGap([0], 2); // copia de la primera entre la 2 y la 3
+        Assert.Equal([220, 200, 220, 210], Widths(vm));
+        Assert.Equal([2], vm.SelectedPageIndexes);
+
+        vm.UndoCommand.Execute(null);
+        vm.UndoCommand.Execute(null);
+        vm.UndoCommand.Execute(null);
+        Assert.Equal([200, 210, 220], Widths(vm));
+    }
+
+    [Fact]
     public void Applying_a_markup_tool_with_selected_text_creates_a_highlight_and_clears_selection()
     {
         var (vm, _) = Open(1);
