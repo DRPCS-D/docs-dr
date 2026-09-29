@@ -377,14 +377,32 @@ public sealed partial class MuPdfDocument
         return (img.Image, mask);
     }
 
-    /// <summary>Quita las imágenes que tocan la caja (sin tocar el texto ni los gráficos vectoriales).</summary>
+    /// <summary>
+    /// Quita SOLO la imagen indicada. MuPDF borra cualquier imagen que toque el rectángulo, así que antes se guardan las
+    /// otras imágenes que lo tocan y después se vuelven a colocar en su sitio (quedan por encima del resto de la página).
+    /// </summary>
     private void RemoveImageAt(PageImageInfo image)
     {
         var b = image.Box;
         var inner = new PdfRect(b.X0 + 1, b.Y0 + 1, Math.Max(b.X0 + 2, b.X1 - 1), Math.Max(b.Y0 + 2, b.Y1 - 1));
         var p = _doc[image.PageIndex];
+
+        var others = new List<(PdfRect Box, byte[] Bytes, byte[]? Mask)>();
+        foreach (var info in p.GetImageInfo(true))
+        {
+            if (info.Xref <= 0) continue;
+            var box = ToView(p, info.Bbox);
+            bool isTarget = info.Xref == image.Xref
+                && Math.Abs(box.X0 - b.X0) < 1 && Math.Abs(box.Y0 - b.Y0) < 1 && Math.Abs(box.X1 - b.X1) < 1 && Math.Abs(box.Y1 - b.Y1) < 1;
+            if (isTarget || !box.Intersects(inner)) continue;
+            var (bytes, mask) = ExtractImageData(info.Xref);
+            others.Add((box, bytes, mask));
+        }
+
         p.AddRedactAnnot(ToUnrotated(p, inner), null!, null!, 11f, 0, null!, null!, false);
         p.ApplyRedactions(images: RedactImageRemove, graphics: RedactLineArtNone, text: RedactTextNone);
+
+        foreach (var o in others) Place(image.PageIndex, o.Box, o.Bytes, o.Mask, keepProportion: false);
     }
 
     private void Place(int page, PdfRect box, byte[] image, byte[]? mask, bool keepProportion)

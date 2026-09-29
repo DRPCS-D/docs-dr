@@ -70,6 +70,48 @@ public class ToolsTests : IDisposable
         doc.Dispose();
     }
 
+    private static byte[] SolidColorPng(byte r, byte g, byte b)
+    {
+        lock (MuPdfDocument.NativeLock)
+        {
+            var pix = new Pixmap(new Colorspace(Utils.CS_RGB), 20, 20, new byte[20 * 20 * 3], false);
+            for (int y = 0; y < 20; y++)
+                for (int x = 0; x < 20; x++)
+                    pix.SetPixel(x, y, [r, g, b]);
+            return pix.ToBytes("png");
+        }
+    }
+
+    [Theory]
+    [InlineData("move")]
+    [InlineData("delete")]
+    public void Moving_or_deleting_an_image_keeps_the_other_images_that_touch_its_box(string operation)
+    {
+        var green = SolidColorPng(0, 200, 0);
+        var blue = SolidColorPng(0, 0, 220);
+        // A (azul) y B (verde) se solapan: B cubre la parte derecha de A.
+        var path = Create(p =>
+        {
+            p.InsertImage(new MuPDF.NET.Rect(100, 150, 200, 200), stream: blue, keepProportion: false);
+            p.InsertImage(new MuPDF.NET.Rect(180, 160, 280, 210), stream: green, keepProportion: false);
+        });
+        var (doc, ed) = Open(path);
+        var a = ed.GetImages(0).Single(i => Math.Abs(i.Box.X0 - 100) < 1);
+
+        if (operation == "move") ed.MoveImage(a, new PdfRect(10, 10, 110, 60));
+        else ed.DeleteImage(a);
+
+        var images = ed.GetImages(0);
+        Assert.Contains(images, i => Math.Abs(i.Box.X0 - 180) < 1.5 && Math.Abs(i.Box.Y0 - 160) < 1.5); // B sigue en su sitio
+        Assert.Equal(operation == "move" ? 2 : 1, images.Count);
+        var r = doc.Render(0, 1);
+        int Pixel(int x, int y, int c) => r.Pixels[y * r.Stride + x * 3 + c];
+        Assert.True(Pixel(240, 185, 1) > 150 && Pixel(240, 185, 0) < 60, "B (verde) debe seguir visible");
+        Assert.True(Pixel(120, 170, 0) > 240 && Pixel(120, 170, 1) > 240, "el sitio de A debe quedar vacío");
+        if (operation == "move") Assert.True(Pixel(50, 30, 2) > 150 && Pixel(50, 30, 0) < 60, "A (azul) debe estar en su nueva posición");
+        doc.Dispose();
+    }
+
     [Fact]
     public void Ocr_reports_unavailable_data_instead_of_failing()
     {
