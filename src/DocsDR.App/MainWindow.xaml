@@ -135,7 +135,58 @@
                 </ToolBarTray>
             </TabItem>
 
-            <!-- 2 · Anotaciones -->
+            <!-- 2 · Edición del contenido existente -->
+            <TabItem Header="Edición" FontWeight="SemiBold">
+                <StackPanel>
+                    <ToolBarTray>
+                        <ToolBar Band="0" DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding UndoCommand}" ToolTip="Deshacer (Ctrl+Z)" Content="↶" />
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding RedoCommand}" ToolTip="Rehacer (Ctrl+Y)" Content="↷" />
+                            <Separator />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="✎ Editar texto" ToolTip="Modificar texto que ya está en el documento"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.EditText}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.EditText}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="＋ Texto" ToolTip="Agregar un texto nuevo a la página"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.AddText}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.AddText}}" />
+                            <Separator />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="🖼 Editar imagen" ToolTip="Seleccionar, mover y redimensionar imágenes del documento"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.EditObjects}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.EditObjects}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="＋ Imagen" ToolTip="Insertar una imagen nueva en la página"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.AddPageImage}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.AddPageImage}}" />
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding ReplaceSelectedImageCommand}" Content="⇄ Reemplazar imagen…" ToolTip="Cambiar la imagen seleccionada por otra" />
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding DeleteSelectedImageCommand}" Content="🗑 Eliminar imagen" ToolTip="Eliminar la imagen seleccionada (Supr)" />
+                        </ToolBar>
+                        <ToolBar Band="1" DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <TextBlock Text="Fuente" VerticalAlignment="Center" Margin="4,0" />
+                            <ComboBox Width="140" ItemsSource="{x:Static vm:DocumentViewModel.TextFamilies}" SelectedItem="{Binding TextFamily}"
+                                      ToolTip="Familia de la fuente. Al editar, se usa la equivalente al tipo original (Arial, Times New Roman o Courier New)." />
+                            <ComboBox Width="64" ItemsSource="{Binding TextSizes}" SelectedItem="{Binding TextSize}" ToolTip="Tamaño en puntos" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="B" FontWeight="Bold" ToolTip="Negrita" IsChecked="{Binding TextBold}" MinWidth="30" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="I" FontStyle="Italic" ToolTip="Cursiva" IsChecked="{Binding TextItalic}" MinWidth="30" />
+                            <ComboBox Width="130" ItemsSource="{Binding TextColors}" SelectedItem="{Binding TextColor}" ToolTip="Color del texto">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:ColorOption}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Rectangle Width="14" Height="14" Fill="{Binding Brush}" Stroke="#60000000" Margin="0,0,6,0" />
+                                            <TextBlock Text="{Binding Name}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <ComboBox Width="116" ItemsSource="{x:Static vm:DocumentViewModel.TextAlignments}" SelectedIndex="{Binding TextAlignIndex}" ToolTip="Alineación" />
+                            <Separator />
+                            <CheckBox Content="Editar párrafo completo" IsChecked="{Binding ParagraphMode}" VerticalAlignment="Center" Margin="4,0"
+                                      ToolTip="Al hacer clic se edita todo el párrafo y se reajusta; si no, solo el renglón" />
+                        </ToolBar>
+                    </ToolBarTray>
+                    <TextBlock DataContext="{Binding SelectedDocument}" Text="{Binding ToolHint}" Opacity="0.7" FontSize="12" FontWeight="Normal" Margin="10,2,10,4" />
+                </StackPanel>
+            </TabItem>
+
+            <!-- 3 · Anotaciones -->
             <TabItem Header="Anotaciones" FontWeight="SemiBold">
                 <StackPanel>
                     <ToolBarTray>
@@ -204,57 +255,6 @@
                             </ComboBox>
                             <ComboBox Width="70" ItemsSource="{x:Static vm:DocumentViewModel.StrokeWidths}" SelectedItem="{Binding StrokeWidth}"
                                       ToolTip="Grosor de línea (lápiz y formas)" />
-                        </ToolBar>
-                    </ToolBarTray>
-                    <TextBlock DataContext="{Binding SelectedDocument}" Text="{Binding ToolHint}" Opacity="0.7" FontSize="12" FontWeight="Normal" Margin="10,2,10,4" />
-                </StackPanel>
-            </TabItem>
-
-            <!-- 3 · Edición del contenido existente -->
-            <TabItem Header="Edición" FontWeight="SemiBold">
-                <StackPanel>
-                    <ToolBarTray>
-                        <ToolBar Band="0" DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
-                            <Button Style="{StaticResource ToolButton}" Command="{Binding UndoCommand}" ToolTip="Deshacer (Ctrl+Z)" Content="↶" />
-                            <Button Style="{StaticResource ToolButton}" Command="{Binding RedoCommand}" ToolTip="Rehacer (Ctrl+Y)" Content="↷" />
-                            <Separator />
-                            <ToggleButton Style="{StaticResource ToolToggle}" Content="✎ Editar texto" ToolTip="Modificar texto que ya está en el documento"
-                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.EditText}"
-                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.EditText}}" />
-                            <ToggleButton Style="{StaticResource ToolToggle}" Content="＋ Texto" ToolTip="Agregar un texto nuevo a la página"
-                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.AddText}"
-                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.AddText}}" />
-                            <Separator />
-                            <ToggleButton Style="{StaticResource ToolToggle}" Content="🖼 Editar imagen" ToolTip="Seleccionar, mover y redimensionar imágenes del documento"
-                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.EditObjects}"
-                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.EditObjects}}" />
-                            <ToggleButton Style="{StaticResource ToolToggle}" Content="＋ Imagen" ToolTip="Insertar una imagen nueva en la página"
-                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.AddPageImage}"
-                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.AddPageImage}}" />
-                            <Button Style="{StaticResource ToolButton}" Command="{Binding ReplaceSelectedImageCommand}" Content="⇄ Reemplazar imagen…" ToolTip="Cambiar la imagen seleccionada por otra" />
-                            <Button Style="{StaticResource ToolButton}" Command="{Binding DeleteSelectedImageCommand}" Content="🗑 Eliminar imagen" ToolTip="Eliminar la imagen seleccionada (Supr)" />
-                        </ToolBar>
-                        <ToolBar Band="1" DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
-                            <TextBlock Text="Fuente" VerticalAlignment="Center" Margin="4,0" />
-                            <ComboBox Width="140" ItemsSource="{x:Static vm:DocumentViewModel.TextFamilies}" SelectedItem="{Binding TextFamily}"
-                                      ToolTip="Familia de la fuente. Al editar, se usa la equivalente al tipo original (Arial, Times New Roman o Courier New)." />
-                            <ComboBox Width="64" ItemsSource="{Binding TextSizes}" SelectedItem="{Binding TextSize}" ToolTip="Tamaño en puntos" />
-                            <ToggleButton Style="{StaticResource ToolToggle}" Content="B" FontWeight="Bold" ToolTip="Negrita" IsChecked="{Binding TextBold}" MinWidth="30" />
-                            <ToggleButton Style="{StaticResource ToolToggle}" Content="I" FontStyle="Italic" ToolTip="Cursiva" IsChecked="{Binding TextItalic}" MinWidth="30" />
-                            <ComboBox Width="130" ItemsSource="{Binding TextColors}" SelectedItem="{Binding TextColor}" ToolTip="Color del texto">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type vm:ColorOption}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <Rectangle Width="14" Height="14" Fill="{Binding Brush}" Stroke="#60000000" Margin="0,0,6,0" />
-                                            <TextBlock Text="{Binding Name}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <ComboBox Width="116" ItemsSource="{x:Static vm:DocumentViewModel.TextAlignments}" SelectedIndex="{Binding TextAlignIndex}" ToolTip="Alineación" />
-                            <Separator />
-                            <CheckBox Content="Editar párrafo completo" IsChecked="{Binding ParagraphMode}" VerticalAlignment="Center" Margin="4,0"
-                                      ToolTip="Al hacer clic se edita todo el párrafo y se reajusta; si no, solo el renglón" />
                         </ToolBar>
                     </ToolBarTray>
                     <TextBlock DataContext="{Binding SelectedDocument}" Text="{Binding ToolHint}" Opacity="0.7" FontSize="12" FontWeight="Normal" Margin="10,2,10,4" />
