@@ -1,0 +1,345 @@
+<Window x:Class="DocsDR.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:DocsDR.App.ViewModels"
+        xmlns:views="clr-namespace:DocsDR.App.Views"
+        Title="DOCS-DR" Icon="Assets/icon.ico" Height="900" Width="1360" WindowStartupLocation="CenterScreen"
+        AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver" Closing="OnClosing">
+    <Window.Resources>
+        <views:EqualsConverter x:Key="EqualsConverter" />
+    </Window.Resources>
+    <Window.InputBindings>
+        <KeyBinding Key="F1" Command="{Binding ShowAboutCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="O" Command="{Binding OpenCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="S" Command="{Binding SaveCommand}" />
+        <KeyBinding Modifiers="Ctrl+Shift" Key="S" Command="{Binding SaveAsCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="Z" Command="{Binding SelectedDocument.UndoCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="Y" Command="{Binding SelectedDocument.RedoCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="W" Command="{Binding CloseDocumentCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="P" Command="{Binding PrintCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="E" Command="{Binding ConvertToExcelCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="OemPlus" Command="{Binding SelectedDocument.ZoomInCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="OemMinus" Command="{Binding SelectedDocument.ZoomOutCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="D0" Command="{Binding SelectedDocument.ActualSizeCommand}" />
+        <KeyBinding Key="F3" Command="{Binding SelectedDocument.NextHitCommand}" />
+        <KeyBinding Modifiers="Shift" Key="F3" Command="{Binding SelectedDocument.PreviousHitCommand}" />
+        <KeyBinding Key="PageDown" Command="{Binding SelectedDocument.NextPageCommand}" />
+        <KeyBinding Key="PageUp" Command="{Binding SelectedDocument.PreviousPageCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="Home" Command="{Binding SelectedDocument.FirstPageCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="End" Command="{Binding SelectedDocument.LastPageCommand}" />
+    </Window.InputBindings>
+
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Archivo">
+                <MenuItem Header="_Abrir…" InputGestureText="Ctrl+O" Command="{Binding OpenCommand}" />
+                <MenuItem Header="_Recientes" ItemsSource="{Binding RecentFiles}">
+                    <MenuItem.ItemContainerStyle>
+                        <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                            <Setter Property="Header" Value="{Binding}" />
+                            <Setter Property="Command" Value="{Binding DataContext.OpenPathCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                            <Setter Property="CommandParameter" Value="{Binding}" />
+                        </Style>
+                    </MenuItem.ItemContainerStyle>
+                </MenuItem>
+                <Separator />
+                <MenuItem Header="_Guardar" InputGestureText="Ctrl+S" Command="{Binding SaveCommand}" />
+                <MenuItem Header="Guardar _como…" InputGestureText="Ctrl+Mayús+S" Command="{Binding SaveAsCommand}" />
+                <MenuItem Header="_Unir PDFs…" Command="{Binding MergePdfsCommand}" />
+                <Separator />
+                <MenuItem Header="_Imprimir…" InputGestureText="Ctrl+P" Command="{Binding PrintCommand}" />
+                <MenuItem Header="_Cerrar documento" InputGestureText="Ctrl+W" Command="{Binding CloseDocumentCommand}" />
+                <Separator />
+                <MenuItem Header="_Salir" Command="{Binding ExitCommand}" />
+            </MenuItem>
+            <MenuItem Header="_Editar" IsEnabled="{Binding HasDocument}">
+                <MenuItem Header="_Deshacer" InputGestureText="Ctrl+Z" Command="{Binding SelectedDocument.UndoCommand}" />
+                <MenuItem Header="_Rehacer" InputGestureText="Ctrl+Y" Command="{Binding SelectedDocument.RedoCommand}" />
+                <Separator />
+                <MenuItem Header="Editar texto de la anotación…" Command="{Binding SelectedDocument.EditSelectedAnnotationTextCommand}" />
+                <MenuItem Header="Eliminar anotación" InputGestureText="Supr" Command="{Binding SelectedDocument.DeleteSelectedAnnotationCommand}" />
+            </MenuItem>
+            <MenuItem Header="_Ver" IsEnabled="{Binding HasDocument}">
+                <MenuItem Header="Acercar" InputGestureText="Ctrl++" Command="{Binding SelectedDocument.ZoomInCommand}" />
+                <MenuItem Header="Alejar" InputGestureText="Ctrl+-" Command="{Binding SelectedDocument.ZoomOutCommand}" />
+                <MenuItem Header="Tamaño real" InputGestureText="Ctrl+0" Command="{Binding SelectedDocument.ActualSizeCommand}" />
+                <MenuItem Header="Ajustar al ancho" Command="{Binding SelectedDocument.FitWidthCommand}" />
+                <MenuItem Header="Ajustar a la página" Command="{Binding SelectedDocument.FitPageCommand}" />
+            </MenuItem>
+            <MenuItem Header="_Páginas" IsEnabled="{Binding HasDocument}">
+                <MenuItem Header="Rotar a la izquierda" Command="{Binding SelectedDocument.RotateLeftCommand}" />
+                <MenuItem Header="Rotar a la derecha" Command="{Binding SelectedDocument.RotateRightCommand}" />
+                <Separator />
+                <MenuItem Header="Insertar página en blanco" Command="{Binding SelectedDocument.InsertBlankPageCommand}" />
+                <MenuItem Header="Insertar desde PDF…" Command="{Binding SelectedDocument.InsertFromPdfCommand}" />
+                <MenuItem Header="Extraer páginas…" Command="{Binding SelectedDocument.ExtractPagesCommand}" />
+                <MenuItem Header="Dividir documento…" Command="{Binding SelectedDocument.SplitDocumentCommand}" />
+                <Separator />
+                <MenuItem Header="Eliminar páginas…" Command="{Binding SelectedDocument.DeletePagesCommand}" />
+            </MenuItem>
+            <MenuItem Header="_Herramientas">
+                <MenuItem Header="Convertir a _Excel…" InputGestureText="Ctrl+E" Command="{Binding ConvertToExcelCommand}" />
+            </MenuItem>
+            <MenuItem Header="A_yuda">
+                <MenuItem Header="_Buscar actualizaciones…" Command="{Binding CheckUpdatesCommand}" />
+                <MenuItem Header="_Soporte por correo" Command="{Binding OpenSupportCommand}" />
+                <MenuItem Header="_Reportar un error" Command="{Binding ReportIssueCommand}" />
+                <MenuItem Header="Sitio del _proyecto" Command="{Binding OpenRepositoryCommand}" />
+                <Separator />
+                <MenuItem Header="_Acerca de DOCS-DR" InputGestureText="F1" Command="{Binding ShowAboutCommand}" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Cinta de opciones: un grupo de funciones por pestaña -->
+        <TabControl x:Name="Ribbon" DockPanel.Dock="Top" SelectionChanged="OnRibbonSelectionChanged"
+                    BorderThickness="0,0,0,1" Padding="0">
+
+            <!-- 1 · Inicio -->
+            <TabItem Header="Inicio" FontWeight="SemiBold">
+                <ToolBarTray>
+                    <ToolBar Band="0">
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding OpenCommand}" ToolTip="Abrir (Ctrl+O)" Content="📂 Abrir" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding SaveCommand}" ToolTip="Guardar (Ctrl+S)" Content="💾 Guardar" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding PrintCommand}" ToolTip="Imprimir (Ctrl+P)" Content="🖨 Imprimir" />
+                        <Separator />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding SelectedDocument.UndoCommand}" ToolTip="Deshacer (Ctrl+Z)" Content="↶" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding SelectedDocument.RedoCommand}" ToolTip="Rehacer (Ctrl+Y)" Content="↷" />
+                    </ToolBar>
+                    <ToolBar Band="0" DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding PreviousPageCommand}" ToolTip="Página anterior" Content="◀" />
+                        <TextBox x:Name="PageBox" Width="44" TextAlignment="Center" VerticalContentAlignment="Center"
+                                 Text="{Binding CurrentPage, Mode=OneWay}" KeyDown="OnPageBoxKeyDown" />
+                        <TextBlock VerticalAlignment="Center" Margin="4,0">
+                            <Run Text="de" /> <Run Text="{Binding PageCount, Mode=OneWay}" />
+                        </TextBlock>
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding NextPageCommand}" ToolTip="Página siguiente" Content="▶" />
+                        <Separator />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ZoomOutCommand}" ToolTip="Alejar (Ctrl+-)" Content="−" />
+                        <TextBlock Text="{Binding ZoomPercent}" VerticalAlignment="Center" MinWidth="44" TextAlignment="Center" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ZoomInCommand}" ToolTip="Acercar (Ctrl++)" Content="+" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding FitWidthCommand}" ToolTip="Ajustar al ancho" Content="↔ Ancho" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding FitPageCommand}" ToolTip="Ajustar a la página" Content="⤢ Página" />
+                    </ToolBar>
+                    <ToolBar Band="0" DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <TextBox x:Name="SearchBox" Width="180" VerticalContentAlignment="Center"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Buscar (Ctrl+F)">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                            </TextBox.InputBindings>
+                        </TextBox>
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding SearchCommand}" Content="🔍" ToolTip="Buscar" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding PreviousHitCommand}" Content="↑" ToolTip="Anterior (Shift+F3)" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding NextHitCommand}" Content="↓" ToolTip="Siguiente (F3)" />
+                        <TextBlock Text="{Binding SearchStatus}" VerticalAlignment="Center" Margin="6,0" />
+                    </ToolBar>
+                </ToolBarTray>
+            </TabItem>
+
+            <!-- 2 · Anotaciones -->
+            <TabItem Header="Anotaciones" FontWeight="SemiBold">
+                <StackPanel>
+                    <ToolBarTray>
+                        <ToolBar DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding UndoCommand}" ToolTip="Deshacer (Ctrl+Z)" Content="↶" />
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding RedoCommand}" ToolTip="Rehacer (Ctrl+Y)" Content="↷" />
+                            <Separator />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="↖" ToolTip="Seleccionar texto y anotaciones (Esc)"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Select}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Select}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="🖍" ToolTip="Resaltar texto"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Highlight}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Highlight}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" ToolTip="Subrayar texto"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Underline}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Underline}}">
+                                <TextBlock Text="U" TextDecorations="Underline" FontWeight="SemiBold" />
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource ToolToggle}" ToolTip="Tachar texto"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.StrikeOut}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.StrikeOut}}">
+                                <TextBlock Text="S" TextDecorations="Strikethrough" FontWeight="SemiBold" />
+                            </ToggleButton>
+                            <Separator />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="🗒" ToolTip="Nota adhesiva (clic en la página)"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Note}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Note}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="T" FontWeight="SemiBold" ToolTip="Cuadro de texto (arrastra un área)"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.FreeText}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.FreeText}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="✎" ToolTip="Lápiz (dibujo libre)"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Ink}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Ink}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="▭" ToolTip="Rectángulo"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Rectangle}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Rectangle}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="◯" ToolTip="Elipse"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Ellipse}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Ellipse}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="╱" ToolTip="Línea"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Line}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Line}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="➝" ToolTip="Flecha"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Arrow}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Arrow}}" />
+                            <Separator />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="▣ Sello" ToolTip="Colocar el sello elegido (clic en la página)"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Stamp}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Stamp}}" />
+                            <ComboBox Width="120" ItemsSource="{x:Static vm:DocumentViewModel.Stamps}" DisplayMemberPath="Name"
+                                      SelectedItem="{Binding SelectedStamp}" ToolTip="Tipo de sello" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="🖼 Imagen" ToolTip="Insertar una imagen o firma como anotación"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.Image}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.Image}}" />
+                            <Separator />
+                            <ComboBox Width="130" ItemsSource="{x:Static vm:DocumentViewModel.Colors}" SelectedItem="{Binding Color}"
+                                      ToolTip="Color (también cambia el de la anotación seleccionada)">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:ColorOption}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Rectangle Width="14" Height="14" Fill="{Binding Brush}" Stroke="#60000000" Margin="0,0,6,0" />
+                                            <TextBlock Text="{Binding Name}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <ComboBox Width="70" ItemsSource="{x:Static vm:DocumentViewModel.StrokeWidths}" SelectedItem="{Binding StrokeWidth}"
+                                      ToolTip="Grosor de línea (lápiz y formas)" />
+                        </ToolBar>
+                    </ToolBarTray>
+                    <TextBlock DataContext="{Binding SelectedDocument}" Text="{Binding ToolHint}" Opacity="0.7" FontSize="12" FontWeight="Normal" Margin="10,2,10,4" />
+                </StackPanel>
+            </TabItem>
+
+            <!-- 3 · Edición del contenido existente -->
+            <TabItem Header="Edición" FontWeight="SemiBold">
+                <StackPanel>
+                    <ToolBarTray>
+                        <ToolBar Band="0" DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding UndoCommand}" ToolTip="Deshacer (Ctrl+Z)" Content="↶" />
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding RedoCommand}" ToolTip="Rehacer (Ctrl+Y)" Content="↷" />
+                            <Separator />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="✎ Editar texto" ToolTip="Modificar texto que ya está en el documento"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.EditText}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.EditText}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="＋ Texto" ToolTip="Agregar un texto nuevo a la página"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.AddText}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.AddText}}" />
+                            <Separator />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="🖼 Editar imagen" ToolTip="Seleccionar, mover y redimensionar imágenes del documento"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.EditObjects}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.EditObjects}}" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="＋ Imagen" ToolTip="Insertar una imagen nueva en la página"
+                                          Command="{Binding SetToolCommand}" CommandParameter="{x:Static vm:AnnotTool.AddPageImage}"
+                                          IsChecked="{Binding Tool, Mode=OneWay, Converter={StaticResource EqualsConverter}, ConverterParameter={x:Static vm:AnnotTool.AddPageImage}}" />
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding ReplaceSelectedImageCommand}" Content="⇄ Reemplazar imagen…" ToolTip="Cambiar la imagen seleccionada por otra" />
+                            <Button Style="{StaticResource ToolButton}" Command="{Binding DeleteSelectedImageCommand}" Content="🗑 Eliminar imagen" ToolTip="Eliminar la imagen seleccionada (Supr)" />
+                        </ToolBar>
+                        <ToolBar Band="1" DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <TextBlock Text="Fuente" VerticalAlignment="Center" Margin="4,0" />
+                            <ComboBox Width="140" ItemsSource="{x:Static vm:DocumentViewModel.TextFamilies}" SelectedItem="{Binding TextFamily}"
+                                      ToolTip="Familia de la fuente. Al editar, se usa la equivalente al tipo original (Arial, Times New Roman o Courier New)." />
+                            <ComboBox Width="64" ItemsSource="{Binding TextSizes}" SelectedItem="{Binding TextSize}" ToolTip="Tamaño en puntos" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="B" FontWeight="Bold" ToolTip="Negrita" IsChecked="{Binding TextBold}" MinWidth="30" />
+                            <ToggleButton Style="{StaticResource ToolToggle}" Content="I" FontStyle="Italic" ToolTip="Cursiva" IsChecked="{Binding TextItalic}" MinWidth="30" />
+                            <ComboBox Width="130" ItemsSource="{Binding TextColors}" SelectedItem="{Binding TextColor}" ToolTip="Color del texto">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:ColorOption}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Rectangle Width="14" Height="14" Fill="{Binding Brush}" Stroke="#60000000" Margin="0,0,6,0" />
+                                            <TextBlock Text="{Binding Name}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <ComboBox Width="116" ItemsSource="{x:Static vm:DocumentViewModel.TextAlignments}" SelectedIndex="{Binding TextAlignIndex}" ToolTip="Alineación" />
+                            <Separator />
+                            <CheckBox Content="Editar párrafo completo" IsChecked="{Binding ParagraphMode}" VerticalAlignment="Center" Margin="4,0"
+                                      ToolTip="Al hacer clic se edita todo el párrafo y se reajusta; si no, solo el renglón" />
+                        </ToolBar>
+                    </ToolBarTray>
+                    <TextBlock DataContext="{Binding SelectedDocument}" Text="{Binding ToolHint}" Opacity="0.7" FontSize="12" FontWeight="Normal" Margin="10,2,10,4" />
+                </StackPanel>
+            </TabItem>
+
+            <!-- 4 · Páginas -->
+            <TabItem Header="Páginas" FontWeight="SemiBold">
+                <ToolBarTray>
+                    <ToolBar Band="0" DataContext="{Binding SelectedDocument}" IsEnabled="{Binding DataContext.HasDocument, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding RotateLeftCommand}" Content="↺ Girar izquierda" ToolTip="Gira las páginas marcadas (o la actual) 90° a la izquierda" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding RotateRightCommand}" Content="↻ Girar derecha" ToolTip="Gira las páginas marcadas (o la actual) 90° a la derecha" />
+                        <Separator />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding InsertBlankPageCommand}" Content="＋ Página en blanco" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding InsertFromPdfCommand}" Content="⤓ Insertar desde PDF…" />
+                        <Separator />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ExtractPagesCommand}" Content="⧉ Extraer…" ToolTip="Guarda las páginas marcadas como un PDF nuevo" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding SplitDocumentCommand}" Content="✂ Dividir…" ToolTip="Divide el documento en varios archivos" />
+                        <Separator />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding DeletePagesCommand}" Content="🗑 Eliminar páginas" />
+                    </ToolBar>
+                    <ToolBar Band="0">
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding MergePdfsCommand}" Content="⊞ Unir PDFs…" ToolTip="Combina varios archivos PDF en uno" />
+                    </ToolBar>
+                </ToolBarTray>
+            </TabItem>
+
+            <!-- 5 · Convertir -->
+            <TabItem Header="Convertir" FontWeight="SemiBold">
+                <ToolBarTray>
+                    <ToolBar>
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ConvertToExcelCommand}" FontWeight="SemiBold"
+                                ToolTip="Detectar tablas y exportar a Excel (Ctrl+E)" Content="📊 Convertir a Excel…" />
+                    </ToolBar>
+                </ToolBarTray>
+            </TabItem>
+
+            <!-- 6 · Ayuda -->
+            <TabItem Header="Ayuda" FontWeight="SemiBold">
+                <ToolBarTray>
+                    <ToolBar>
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ShowAboutCommand}" Content="ℹ Acerca de" ToolTip="Versión, autor y licencias (F1)" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding CheckUpdatesCommand}" Content="⟳ Buscar actualizaciones" ToolTip="Comprueba si hay una versión nueva y la instala" />
+                    </ToolBar>
+                    <ToolBar>
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding OpenSupportCommand}" Content="✉ Soporte" ToolTip="Escribir un correo a soporte" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding ReportIssueCommand}" Content="🐞 Reportar un error" ToolTip="Abre la página de incidencias del proyecto" />
+                        <Button Style="{StaticResource ToolButton}" Command="{Binding OpenRepositoryCommand}" Content="🌐 Sitio del proyecto" ToolTip="Abre el repositorio en GitHub" />
+                    </ToolBar>
+                </ToolBarTray>
+            </TabItem>
+        </TabControl>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem Content="{Binding StatusText}" />
+        </StatusBar>
+
+        <Grid>
+            <TabControl ItemsSource="{Binding Documents}" SelectedItem="{Binding SelectedDocument}">
+                <TabControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:DocumentViewModel}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding DisplayTitle}" MaxWidth="220" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       ToolTip="{Binding FilePath}" />
+                            <Button Content="✕" Padding="4,0" Margin="8,0,0,0" MinWidth="0" BorderThickness="0" Background="Transparent"
+                                    ToolTip="Cerrar"
+                                    Command="{Binding DataContext.CloseDocumentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </TabControl.ItemTemplate>
+                <TabControl.ContentTemplate>
+                    <DataTemplate DataType="{x:Type vm:DocumentViewModel}">
+                        <views:DocumentView />
+                    </DataTemplate>
+                </TabControl.ContentTemplate>
+            </TabControl>
+
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Visibility="{Binding HasDocument, Converter={StaticResource InverseBoolToVisibility}}"
+                        x:Name="EmptyState">
+                <TextBlock Text="DOCS-DR" FontSize="32" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Text="Arrastra un PDF aquí o usa Archivo › Abrir" FontSize="15" Opacity="0.7" Margin="0,8,0,16" HorizontalAlignment="Center" />
+                <Button Content="Abrir PDF…" Command="{Binding OpenCommand}" HorizontalAlignment="Center" Padding="18,6" />
+            </StackPanel>
+        </Grid>
+    </DockPanel>
+</Window>

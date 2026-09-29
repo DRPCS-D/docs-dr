@@ -1,0 +1,69 @@
+<Window x:Class="DocsDR.App.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Acerca de DOCS-DR" Icon="/Assets/icon.ico" Width="520" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="24,20,24,16">
+        <StackPanel Orientation="Horizontal">
+            <Image Source="/Assets/icon-256.png" Width="64" Height="64" Margin="0,0,16,0" RenderOptions.BitmapScalingMode="HighQuality" />
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock x:Name="NameText" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock x:Name="VersionText" Opacity="0.7" Margin="0,2,0,0" />
+            </StackPanel>
+        </StackPanel>
+        <Border Height="10" />
+        <TextBlock x:Name="DescriptionText" TextWrapping="Wrap" />
+
+        <Separator Margin="0,14" />
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="Empresa" Opacity="0.7" Margin="0,2,16,2" />
+            <TextBlock Grid.Row="0" Grid.Column="1" x:Name="CompanyText" Margin="0,2" />
+            <TextBlock Grid.Row="1" Text="Autor" Opacity="0.7" Margin="0,2,16,2" />
+            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="AuthorText" Margin="0,2" />
+            <TextBlock Grid.Row="2" Text="Soporte" Opacity="0.7" Margin="0,2,16,2" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,2">
+                <Hyperlink x:Name="MailLink" Click="OnMailClick"><Run x:Name="MailText" /></Hyperlink>
+            </TextBlock>
+            <TextBlock Grid.Row="3" Text="Código" Opacity="0.7" Margin="0,2,16,2" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,2">
+                <Hyperlink x:Name="RepoLink" Click="OnRepoClick"><Run x:Name="RepoText" /></Hyperlink>
+            </TextBlock>
+        </Grid>
+
+        <TextBlock x:Name="CopyrightText" Opacity="0.7" Margin="0,14,0,0" />
+
+        <Expander Header="Licencias de terceros" Margin="0,14,0,0">
+            <StackPanel Margin="0,8,0,0">
+                <ItemsControl x:Name="Libraries">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="90" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock TextTrimming="CharacterEllipsis">
+                                    <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" />
+                                    <Run Text="{Binding Owner, Mode=OneWay, StringFormat=' · {0}'}" />
+                                </TextBlock>
+                                <TextBlock Grid.Column="1" Text="{Binding License}" HorizontalAlignment="Right" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock TextWrapping="Wrap" FontSize="12" Opacity="0.8" Margin="0,8,0,0"
+                           Text="DOCS-DR incluye MuPDF, licenciado bajo AGPL-3.0. Por eso el código fuente de DOCS-DR se publica en el repositorio indicado arriba, y quien reciba la aplicación puede obtenerlo." />
+            </StackPanel>
+        </Expander>
+
+        <Button Content="Cerrar" IsDefault="True" IsCancel="True" HorizontalAlignment="Right" MinWidth="90" Margin="0,18,0,0" />
+    </StackPanel>
+</Window>

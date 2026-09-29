@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <Resource Include="Assets\icon.ico" />
+    <Resource Include="Assets\icon-256.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DocsDR.Core\DocsDR.Core.csproj" />
+    <ProjectReference Include="..\DocsDR.Pdf\DocsDR.Pdf.csproj" />
+    <ProjectReference Include="..\DocsDR.TableExtraction\DocsDR.TableExtraction.csproj" />
+    <ProjectReference Include="..\DocsDR.Excel\DocsDR.Excel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <StartupObject>DocsDR.App.Program</StartupObject>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <AssemblyName>DocsDR</AssemblyName>
+    <Version>1.0.0</Version>
+    <Product>DOCS-DR</Product>
+    <Company>DRPCS E.A.S.</Company>
+    <Authors>Diago Rene Ruiz Diaz Rios</Authors>
+    <Copyright>(c) 2026 DRPCS E.A.S.</Copyright>
+    <Description>Lector y editor de PDF, y convertidor de PDF a Excel para Windows.</Description>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,23 @@
+<Application x:Class="DocsDR.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:DocsDR.App"
+             ThemeMode="System"
+             ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+        <SolidColorBrush x:Key="ViewerBackground" Color="#FF6B7079" />
+        <SolidColorBrush x:Key="HighlightBrush" Color="#66FFD400" />
+        <SolidColorBrush x:Key="SelectionBrush" Color="#661E6FD9" />
+        <Style x:Key="ToolButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Margin" Value="2,0" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="MinWidth" Value="32" />
+        </Style>
+        <Style x:Key="ToolToggle" TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
+            <Setter Property="Margin" Value="2,0" />
+            <Setter Property="Padding" Value="10,4" />
+        </Style>
+    </Application.Resources>
+</Application>
