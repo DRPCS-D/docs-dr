@@ -293,17 +293,6 @@ public class ContentEditingTests : IDisposable
         doc.Dispose();
     }
 
-    [Fact]
-    public void Editing_text_is_refused_on_rotated_pages()
-    {
-        var (doc, ed) = Open(Sample());
-        ed.RotatePages([0], 90);
-        var fmt = new TextFormat(TextFormat.Sans, 12, new PdfColor(0, 0, 0), false, false);
-
-        Assert.Throws<NotSupportedException>(() => ed.AddText(0, new PdfRect(30, 300, 300, 320), "x", fmt, TextAlign.Left));
-        doc.Dispose();
-    }
-
     // ---------------- Imágenes ----------------
 
     private static string WithImage() => Create(p =>

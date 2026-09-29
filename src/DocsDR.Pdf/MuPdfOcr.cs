@@ -17,7 +17,7 @@ public sealed partial class MuPdfDocument
         {
             var p = _doc[page];
             if (p.Rotation != 0) return false;
-            return IsScanned(p, ToWords(p.GetTextWords(sort: true)));
+            return IsScanned(p, ToWords(p.GetTextWords(sort: true), p));
         }
     }
 
@@ -30,7 +30,7 @@ public sealed partial class MuPdfDocument
             using var _ = Invariant();
             var p = _doc[page];
             var tp = p.GetTextPageOcr(flags: 0, language: tess.Value.Languages, dpi: OcrDpiForSearchable, full: true, tessdata: tess.Value.Path);
-            return ToWords(p.GetTextWords(textpage: tp, sort: true));
+            return ToWords(p.GetTextWords(textpage: tp, sort: true), p);
         }
     }
 

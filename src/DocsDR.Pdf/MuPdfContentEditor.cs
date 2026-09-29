@@ -53,7 +53,8 @@ public sealed partial class MuPdfDocument
         lock (NativeLock)
         {
             using var _ = Invariant();
-            if (_doc[page].GetText("dict") is not PageInfo info) return result;
+            var pg = _doc[page];
+            if (pg.GetText("dict") is not PageInfo info) return result;
             foreach (var block in info.Blocks)
             {
                 if (block.Type != 0 || block.Lines is null) continue;
@@ -62,11 +63,20 @@ public sealed partial class MuPdfDocument
                 {
                     var spans = line.Spans.Where(s => !string.IsNullOrWhiteSpace(s.Text)).ToList();
                     if (spans.Count == 0) continue;
+                    // Solo se edita texto que se ve en horizontal y de izquierda a derecha (en una página girada, el texto
+                    // de un documento girado a mano se ve de lado: no se puede editar sin girar la página de vuelta).
+                    var dir = ToViewDirection(pg, line.Dir.X, line.Dir.Y);
+                    if (dir.X < 0.98) continue;
                     var dominant = spans.OrderByDescending(s => s.Text.Length).First();
                     var text = string.Concat(spans.Select(s => s.Text)).Trim();
-                    lines.Add(new TextLineInfo(FromRect(line.Bbox), text, FormatOf(dominant, page), dominant.Origin.Y, RunsOf(spans, page)));
+                    double baseline = ToViewPoint(pg, dominant.Origin).Y;
+                    lines.Add(new TextLineInfo(ToView(pg, line.Bbox), text, FormatOf(dominant, page), baseline, RunsOf(spans, page)));
                 }
-                if (lines.Count > 0) result.Add(new TextBlockInfo(page, FromRect(block.Bbox), lines));
+                if (lines.Count > 0)
+                {
+                    var box = lines.Select(l => l.Box).Aggregate((a, b) => new PdfRect(Math.Min(a.X0, b.X0), Math.Min(a.Y0, b.Y0), Math.Max(a.X1, b.X1), Math.Max(a.Y1, b.Y1)));
+                    result.Add(new TextBlockInfo(page, box, lines));
+                }
             }
         }
         return result;
@@ -108,7 +118,9 @@ public sealed partial class MuPdfDocument
         const int k = 4;
         try
         {
-            using var pix = _doc[page].GetPixmap(matrix: new Matrix(k, k), clip: span.Bbox, colorSpace: "gray");
+            var pg = _doc[page];
+            var view = ToView(pg, span.Bbox);
+            using var pix = pg.GetPixmap(matrix: new Matrix(k, k), clip: ToRect(view), colorSpace: "gray");
             var px = pix.SAMPLES;
             int n = pix.N, w = pix.Width, h = pix.Height, stride = pix.Stride;
             int bg = 0;
@@ -158,7 +170,6 @@ public sealed partial class MuPdfDocument
         lock (NativeLock)
         {
             using var _ = Invariant();
-            RequireUnrotated(page);
             double size = format.Size;
             if (runs is { Count: > 0 } && baseline is double line)
             {
@@ -182,7 +193,6 @@ public sealed partial class MuPdfDocument
         lock (NativeLock)
         {
             using var _ = Invariant();
-            RequireUnrotated(page);
             double size = InsertFitted(page, box, text, format, align, 0, null);
             Invalidate();
             return size;
@@ -193,7 +203,7 @@ public sealed partial class MuPdfDocument
     private void EraseText(int page, PdfRect box)
     {
         var p = _doc[page];
-        p.AddRedactAnnot(ToRect(box), null!, null!, 11f, 0, null!, null!, false);
+        p.AddRedactAnnot(ToUnrotated(p, box), null!, null!, 11f, 0, null!, null!, false);
         p.ApplyRedactions(images: RedactImageNone, graphics: RedactLineArtNone, text: RedactTextRemove);
     }
 
@@ -218,9 +228,9 @@ public sealed partial class MuPdfDocument
                 double dy = target - (rect.Y0 + FirstBaselineOffset(fontFile, fontName, size, lineHeightFactor));
                 rect = rect with { Y0 = rect.Y0 + dy, Y1 = rect.Y1 + dy };
             }
-            var result = p.InsertTextbox(ToRect(rect), text, (int)align, 0f,
+            var result = p.InsertTextbox(ToUnrotated(p, rect), text, (int)align, 0f,
                 [format.Color.R / 255f, format.Color.G / 255f, format.Color.B / 255f], 0, 0f, 1f, null!,
-                fontFile!, fontName, (float)size, lineHeight: lineHeightFactor > 0 ? (float)lineHeightFactor : null);
+                fontFile!, fontName, (float)size, lineHeight: lineHeightFactor > 0 ? (float)lineHeightFactor : null, rotate: p.Rotation);
             // Si el texto no cabe, MuPDF no escribe nada y devuelve un valor negativo.
             if (result.Rc >= 0) return size;
             size = Math.Round(size * FontShrinkStep, 2);
@@ -261,8 +271,9 @@ public sealed partial class MuPdfDocument
             var (file, name) = plan.Fonts[i];
             var f = plan.Runs[i].Format;
             float size = (float)(f.Size * plan.Scale);
-            _doc[page].InsertText(new MuPDF.NET.Point((float)x, (float)baseline), plan.Runs[i].Text, size, name,
-                [f.Color.R / 255f, f.Color.G / 255f, f.Color.B / 255f], 0, 0, 1f, null!, file!);
+            var pg = _doc[page];
+            pg.InsertText(ToUnrotated(pg, x, baseline), plan.Runs[i].Text, size, name,
+                [f.Color.R / 255f, f.Color.G / 255f, f.Color.B / 255f], pg.Rotation, 0, 1f, null!, file!);
             x += TextWidth(plan.Fonts[i], plan.Runs[i].Text, size);
         }
         return Math.Round(plan.Runs.Max(r => r.Format.Size) * plan.Scale, 2);
@@ -311,7 +322,7 @@ public sealed partial class MuPdfDocument
         {
             using var _ = Invariant();
             foreach (var b in _doc[page].GetImageInfo(true))
-                if (b.Xref > 0) result.Add(new PageImageInfo(page, b.Xref, FromRect(b.Bbox)));
+                if (b.Xref > 0) result.Add(new PageImageInfo(page, b.Xref, ToView(_doc[page], b.Bbox)));
         }
         return result;
     }
@@ -321,7 +332,6 @@ public sealed partial class MuPdfDocument
         lock (NativeLock)
         {
             using var _ = Invariant();
-            RequireUnrotated(image.PageIndex);
             var (bytes, mask) = ExtractImageData(image.Xref);
             RemoveImageAt(image);
             Place(image.PageIndex, newBox, bytes, mask, keepProportion: false);
@@ -334,7 +344,6 @@ public sealed partial class MuPdfDocument
         lock (NativeLock)
         {
             using var _ = Invariant();
-            RequireUnrotated(image.PageIndex);
             RemoveImageAt(image);
             Invalidate();
         }
@@ -345,7 +354,6 @@ public sealed partial class MuPdfDocument
         lock (NativeLock)
         {
             using var _ = Invariant();
-            RequireUnrotated(image.PageIndex);
             RemoveImageAt(image);
             Place(image.PageIndex, image.Box, newImage, null, keepProportion: true);
             Invalidate();
@@ -357,7 +365,6 @@ public sealed partial class MuPdfDocument
         lock (NativeLock)
         {
             using var _ = Invariant();
-            RequireUnrotated(page);
             Place(page, box, image, null, keepProportion: true);
             Invalidate();
         }
@@ -376,12 +383,13 @@ public sealed partial class MuPdfDocument
         var b = image.Box;
         var inner = new PdfRect(b.X0 + 1, b.Y0 + 1, Math.Max(b.X0 + 2, b.X1 - 1), Math.Max(b.Y0 + 2, b.Y1 - 1));
         var p = _doc[image.PageIndex];
-        p.AddRedactAnnot(ToRect(inner), null!, null!, 11f, 0, null!, null!, false);
+        p.AddRedactAnnot(ToUnrotated(p, inner), null!, null!, 11f, 0, null!, null!, false);
         p.ApplyRedactions(images: RedactImageRemove, graphics: RedactLineArtNone, text: RedactTextNone);
     }
 
     private void Place(int page, PdfRect box, byte[] image, byte[]? mask, bool keepProportion)
     {
-        _doc[page].InsertImage(ToRect(box), stream: image, mask: mask, keepProportion: keepProportion);
+        var p = _doc[page];
+        p.InsertImage(ToUnrotated(p, box), stream: image, mask: mask, rotate: p.Rotation, keepProportion: keepProportion);
     }
 }

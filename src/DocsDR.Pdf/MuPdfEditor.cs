@@ -25,7 +25,9 @@ public sealed partial class MuPdfDocument : IPdfEditor
         lock (NativeLock)
         {
             var p = _doc[page];
-            var quads = lines.Select(r => new Quad(new MuPDF.NET.Rect((float)r.X0, (float)r.Y0, (float)r.X1, (float)r.Y1))).ToArray();
+            // Las esquinas se convierten una a una y en el orden de la vista (sup. izq., sup. der., inf. izq., inf. der.).
+            var quads = lines.Select(r => new Quad(
+                ToUnrotated(p, r.X0, r.Y0), ToUnrotated(p, r.X1, r.Y0), ToUnrotated(p, r.X0, r.Y1), ToUnrotated(p, r.X1, r.Y1))).ToArray();
             var annot = kind switch
             {
                 AnnotationKind.Highlight => p.AddHighlightAnnot(quads),
@@ -43,7 +45,12 @@ public sealed partial class MuPdfDocument : IPdfEditor
     {
         lock (NativeLock)
         {
-            var annot = _doc[page].AddTextAnnot(new MuPDF.NET.Point((float)at.X, (float)at.Y), text);
+            var p = _doc[page];
+            // MuPDF recibe el punto en la vista, pero ancla el icono (16×16) en el espacio sin girar: en una página girada
+            // queda corrido 16 pt en uno o en los dos ejes (y SetRect no lo mueve). Se compensa desplazando el punto.
+            int rot = p.Rotation;
+            double dx = rot is 90 or 180 ? -16 : 0, dy = rot is 180 or 270 ? -16 : 0;
+            var annot = p.AddTextAnnot(new MuPDF.NET.Point((float)(at.X + dx), (float)(at.Y + dy)), text);
             Stamp(annot, color, author, text);
             Invalidate();
             return annot.Xref;
@@ -55,9 +62,8 @@ public sealed partial class MuPdfDocument : IPdfEditor
         lock (NativeLock)
         {
             using var _ = Invariant();
-            var annot = _doc[page].AddFreeTextAnnot(
-                new MuPDF.NET.Rect((float)box.X0, (float)box.Y0, (float)box.X1, (float)box.Y1),
-                text, fontSize: (float)fontSize, textColor: Rgb(color));
+            var p = _doc[page];
+            var annot = p.AddFreeTextAnnot(ToUnrotated(p, box), text, fontSize: (float)fontSize, textColor: Rgb(color), rotate: p.Rotation);
             annot.SetInfo(text, author, null!, null!, null!);
             Invalidate();
             return annot.Xref;
@@ -68,8 +74,9 @@ public sealed partial class MuPdfDocument : IPdfEditor
     {
         lock (NativeLock)
         {
-            var pts = stroke.Select(s => new MuPDF.NET.Point((float)s.X, (float)s.Y)).ToArray();
-            var annot = _doc[page].AddInkAnnot([pts]);
+            var p = _doc[page];
+            var pts = stroke.Select(s => ToUnrotated(p, s.X, s.Y)).ToArray();
+            var annot = p.AddInkAnnot([pts]);
             annot.SetBorder(width: (float)width);
             Stamp(annot, color, author);
             Invalidate();
@@ -106,13 +113,39 @@ public sealed partial class MuPdfDocument : IPdfEditor
     {
         lock (NativeLock)
         {
-            var annot = _doc[page].AddStampAnnot(
-                new MuPDF.NET.Rect((float)box.X0, (float)box.Y0, (float)box.X1, (float)box.Y1), imageBytes);
+            var p = _doc[page];
+            // La imagen de un sello se dibuja en el espacio sin girar: se gira al revés que la página para que se vea derecha.
+            var annot = p.AddStampAnnot(ToUnrotated(p, box), p.Rotation == 0 ? imageBytes : RotateImage(imageBytes, (360 - p.Rotation) % 360));
             annot.SetInfo("", author, null!, null!, null!);
             annot.Update();
             Invalidate();
             return annot.Xref;
         }
+    }
+
+    /// <summary>Gira una imagen (PNG/JPEG…) un múltiplo de 90° en sentido horario y la devuelve como PNG.</summary>
+    private static byte[] RotateImage(byte[] bytes, int degreesClockwise)
+    {
+        var src = new Pixmap(bytes);
+        int w = src.Width, h = src.Height, n = src.N, stride = src.Stride;
+        var s = src.SAMPLES;
+        bool swap = degreesClockwise is 90 or 270;
+        int nw = swap ? h : w, nh = swap ? w : h;
+        var dst = new byte[nw * nh * n];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int nx, ny;
+                switch (degreesClockwise)
+                {
+                    case 90: nx = h - 1 - y; ny = x; break;
+                    case 180: nx = w - 1 - x; ny = h - 1 - y; break;
+                    default: nx = y; ny = w - 1 - x; break; // 270
+                }
+                Buffer.BlockCopy(s, y * stride + x * n, dst, (ny * nw + nx) * n, n);
+            }
+        var rotated = new Pixmap(src.Colorspace, nw, nh, dst, src.Alpha != 0);
+        return rotated.ToBytes("png");
     }
 
     public IReadOnlyList<AnnotationInfo> GetAnnotations(int page)
@@ -126,11 +159,11 @@ public sealed partial class MuPdfDocument : IPdfEditor
             {
                 var kind = KindOf(a);
                 if (kind is null) continue;
-                var r = a.Rect;
+                var r = ToView(_doc[page], a.Rect);
                 var color = ToColor(a.StrokeColor);
                 // El texto libre no usa trazo: su color es el del texto.
                 result.Add(new AnnotationInfo(page, a.Xref, kind.Value, a.Info?.Content ?? "", a.Info?.Title ?? "",
-                    new PdfRect(r.X0, r.Y0, r.X1, r.Y1), color));
+                    r, color));
             }
         }
         return result;
@@ -183,7 +216,9 @@ public sealed partial class MuPdfDocument : IPdfEditor
         {
             var a = Load(page, id);
             var r = a.Rect;
-            a.SetRect(new MuPDF.NET.Rect(r.X0 + (float)dx, r.Y0 + (float)dy, r.X1 + (float)dx, r.Y1 + (float)dy));
+            // El desplazamiento viene de la vista: se gira al espacio sin girar en el que está la anotación.
+            var (ux, uy) = ToUnrotatedVector(_doc[page], dx, dy);
+            a.SetRect(new MuPDF.NET.Rect(r.X0 + (float)ux, r.Y0 + (float)uy, r.X1 + (float)ux, r.Y1 + (float)uy));
             a.Update();
             Invalidate();
         }

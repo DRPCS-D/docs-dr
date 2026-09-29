@@ -82,7 +82,8 @@ public sealed partial class MuPdfDocument : IPdfDocument
     {
         lock (NativeLock)
         {
-            return ToWords(_doc[pageIndex].GetTextWords(sort: true));
+            var page = _doc[pageIndex];
+            return ToWords(page.GetTextWords(sort: true), page);
         }
     }
 
@@ -96,8 +97,7 @@ public sealed partial class MuPdfDocument : IPdfDocument
             {
                 foreach (var q in _doc[i].SearchFor(text))
                 {
-                    var r = q.Rect;
-                    hits.Add(new SearchHit(i, new PdfRect(r.X0, r.Y0, r.X1, r.Y1)));
+                    hits.Add(new SearchHit(i, ToView(_doc[i], q.Rect)));
                 }
             }
         }
@@ -124,7 +124,7 @@ public sealed partial class MuPdfDocument : IPdfDocument
 
             var page = _doc[pageIndex];
             var rect = page.Rect;
-            var words = ToWords(page.GetTextWords(sort: true));
+            var words = ToWords(page.GetTextWords(sort: true), page);
             bool scanned = IsScanned(page, words);
 
             PageContent content;
@@ -147,7 +147,7 @@ public sealed partial class MuPdfDocument : IPdfDocument
                     else
                     {
                         var tp = page.GetTextPageOcr(flags: 0, language: tess.Value.Languages, dpi: (int)OcrDpi, full: true, tessdata: tess.Value.Path);
-                        words = ToWords(page.GetTextWords(textpage: tp, sort: true));
+                        words = ToWords(page.GetTextWords(textpage: tp, sort: true), page);
                     }
                 }
                 content = new PageContent(pageIndex, rect.Width, rect.Height, words, [], true, image, ocrUnavailable);
@@ -172,15 +172,57 @@ public sealed partial class MuPdfDocument : IPdfDocument
         return imageArea > area * 0.3;
     }
 
-    private static List<TextWord> ToWords(List<(float x0, float y0, float x1, float y1, string word, int blockNo, int lineNo, int wordNo)> blocks) =>
+    private static List<TextWord> ToWords(List<(float x0, float y0, float x1, float y1, string word, int blockNo, int lineNo, int wordNo)> blocks, Page page) =>
         blocks.Where(b => !string.IsNullOrWhiteSpace(b.word))
-              .Select(b => new TextWord(b.word.Trim(), new PdfRect(b.x0, b.y0, b.x1, b.y1)))
+              .Select(b => new TextWord(b.word.Trim(), ToView(page, new MuPDF.NET.Rect(b.x0, b.y0, b.x1, b.y1))))
               .ToList();
+
+    // ---- Páginas giradas ----
+    // MuPDF devuelve el texto, las búsquedas, las imágenes y los trazos en el espacio SIN girar de la página, pero
+    // renderiza (y crea anotaciones) con la página girada. Toda la app trabaja en coordenadas de la VISTA: se convierte aquí.
+
+    /// <summary>Rectángulo del espacio sin girar al de la vista.</summary>
+    internal static PdfRect ToView(Page page, MuPDF.NET.Rect r) =>
+        page.Rotation == 0 ? FromRect(r) : FromRect(r * page.RotationMatrix);
+
+    /// <summary>Rectángulo de la vista al espacio sin girar (el que usan las funciones de escritura de MuPDF).</summary>
+    internal static MuPDF.NET.Rect ToUnrotated(Page page, PdfRect r) =>
+        page.Rotation == 0 ? ToRect(r) : ToRect(r) * page.DerotationMatrix;
+
+    internal static MuPDF.NET.Point ToUnrotated(Page page, double x, double y)
+    {
+        var p = new MuPDF.NET.Point((float)x, (float)y);
+        return page.Rotation == 0 ? p : p * page.DerotationMatrix;
+    }
+
+    /// <summary>Punto del espacio sin girar al de la vista.</summary>
+    internal static (double X, double Y) ToViewPoint(Page page, MuPDF.NET.Point p)
+    {
+        var q = page.Rotation == 0 ? p : p * page.RotationMatrix;
+        return (q.X, q.Y);
+    }
+
+    /// <summary>Desplazamiento de la vista expresado en el espacio sin girar.</summary>
+    internal static (double X, double Y) ToUnrotatedVector(Page page, double dx, double dy)
+    {
+        if (page.Rotation == 0) return (dx, dy);
+        var m = page.DerotationMatrix;
+        return (m.A * dx + m.C * dy, m.B * dx + m.D * dy);
+    }
+
+    /// <summary>Dirección (vector unitario) de un texto tal como se ve en la vista.</summary>
+    internal static (double X, double Y) ToViewDirection(Page page, double dx, double dy)
+    {
+        if (page.Rotation == 0) return (dx, dy);
+        var m = page.RotationMatrix;
+        return (m.A * dx + m.C * dy, m.B * dx + m.D * dy);
+    }
 
     /// <summary>Convierte los trazos vectoriales de la página en segmentos horizontales/verticales.</summary>
     private static List<LineSegment> ExtractLines(Page page)
     {
         var result = new List<LineSegment>();
+        var toView = page.Rotation == 0 ? null : (Matrix?)page.RotationMatrix;
         foreach (var path in page.GetDrawings())
         {
             if (path.Items is null) continue;
@@ -191,13 +233,18 @@ public sealed partial class MuPdfDocument : IPdfDocument
                     case "l" when item.P1 is not null:
                         // MuPDF.NET guarda el punto final de la línea en LastPoint (P2 queda vacío).
                         var end = item.P2 ?? item.LastPoint;
-                        if (end is not null) AddIfAxisAligned(result, item.P1.X, item.P1.Y, end.X, end.Y);
+                        if (end is not null)
+                        {
+                            var a = toView is { } m ? item.P1 * m : item.P1;
+                            var b = toView is { } m2 ? end * m2 : end;
+                            AddIfAxisAligned(result, a.X, a.Y, b.X, b.Y);
+                        }
                         break;
                     case "re" when item.Rect is not null:
-                        AddRect(result, item.Rect);
+                        AddRect(result, toView is { } m3 ? item.Rect * m3 : item.Rect);
                         break;
                     case "qu" when item.Quad is not null && item.Quad.IsRectangular:
-                        AddRect(result, item.Quad.Rect);
+                        AddRect(result, toView is { } m4 ? item.Quad.Rect * m4 : item.Quad.Rect);
                         break;
                 }
             }
