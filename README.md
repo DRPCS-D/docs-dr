@@ -57,7 +57,10 @@ Las funciones están agrupadas en pestañas: **Inicio** (abrir, guardar, imprimi
 - **Reducir tamaño del archivo** (Archivo › Reducir tamaño del archivo…, o pestaña Convertir): crea una copia más liviana sin tocar el documento abierto. Tres niveles: sin pérdida (limpia y comprime), equilibrada (imágenes a 150 ppp) y máxima (96 ppp). Muestra el tamaño antes y después; si no se logra reducir, no guarda nada.
 - **Organizar páginas**: al abrir la pestaña Páginas de la cinta, las páginas se muestran en una cuadrícula. Arrastra para mover (una línea azul marca el destino), Ctrl + arrastrar para duplicar, suelta un PDF para insertar sus páginas; gira, elimina o extrae las marcadas. Doble clic abre la página en el visor.
 - **Lector de PDF predeterminado**: la versión instalada se registra en Windows como candidata para abrir `.pdf` (Ayuda › Establecer como lector de PDF predeterminado… abre la pantalla de Windows donde se elige). Abrir otro PDF añade una pestaña a la ventana ya abierta.
-- **Recordar la vista**: al cerrar se guardan la posición y el tamaño de la ventana y los documentos abiertos (con página y zoom); se reabren al iniciar. Se desactiva en Ver › Reabrir documentos al iniciar.
+- **Archivos recientes en la pantalla principal**: al abrir la app sin documentos, se listan los últimos PDF abiertos para reabrirlos con un clic.
+- **Cuadros de mensaje con el tema de la app**: avisos y preguntas con el mismo aspecto (claro u oscuro) que el resto de la aplicación.
+- **Aviso de actualizaciones**: la versión instalada busca una versión nueva una vez al día, en segundo plano, y lo indica en la barra de estado sin ventanas.
+- **Recordar la vista**: al cerrar se guardan la posición y el tamaño de la ventana y los documentos abiertos (con página y zoom); se reabren al iniciar. Viene desactivado; se activa en Ver › Reabrir documentos al iniciar.
 
 ## Edición del contenido (fase 4, pestaña *Edición*)
 

@@ -120,7 +120,7 @@ public sealed partial class DocumentViewModel
         if (Editor is not { } ed) return;
         if (!ed.OcrAvailable)
         {
-            MessageBox.Show(
+            Msg.Show(
                 "No se encontraron los datos de idioma del OCR (tessdata).\n\n" +
                 $"Copia spa.traineddata y eng.traineddata en:\n{Path.Combine(App.DataFolder, "tessdata")}\n" +
                 "(o ejecuta scripts/get-tessdata.ps1 desde el código fuente).",
@@ -134,11 +134,11 @@ public sealed partial class DocumentViewModel
         if (candidates.Count == 0)
         {
             SearchStatus = "";
-            MessageBox.Show("No hay páginas escaneadas sin texto: este documento ya es buscable.", "PDF buscable (OCR)",
+            Msg.Show("No hay páginas escaneadas sin texto: este documento ya es buscable.", "PDF buscable (OCR)",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (MessageBox.Show(
+        if (Msg.Show(
                 $"Se reconocerá el texto de {candidates.Count} página(s) escaneada(s). Puede tardar unos segundos por página.\n\n" +
                 "La imagen no cambia: se agrega una capa de texto invisible para poder buscar y copiar. Podrás deshacerlo con Ctrl+Z.\n\n¿Continuar?",
                 "PDF buscable (OCR)", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
@@ -165,14 +165,14 @@ public sealed partial class DocumentViewModel
         if (_version != versionAtStart)
         {
             SearchStatus = "";
-            MessageBox.Show("El documento cambió mientras se reconocía el texto. Vuelve a ejecutar el comando.", "PDF buscable (OCR)",
+            Msg.Show("El documento cambió mientras se reconocía el texto. Vuelve a ejecutar el comando.", "PDF buscable (OCR)",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (recognized.Count == 0)
         {
             SearchStatus = "No se reconoció texto";
-            MessageBox.Show("No se pudo reconocer texto en las páginas escaneadas.", "PDF buscable (OCR)", MessageBoxButton.OK, MessageBoxImage.Information);
+            Msg.Show("No se pudo reconocer texto en las páginas escaneadas.", "PDF buscable (OCR)", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -201,7 +201,7 @@ public sealed partial class DocumentViewModel
         if (dlg.ShowDialog() != true) return;
         if (string.Equals(Path.GetFullPath(dlg.FileName), Path.GetFullPath(FilePath), StringComparison.OrdinalIgnoreCase))
         {
-            MessageBox.Show("Elige un nombre distinto al del documento abierto: la copia reducida se guarda aparte.", "Reducir tamaño",
+            Msg.Show("Elige un nombre distinto al del documento abierto: la copia reducida se guarda aparte.", "Reducir tamaño",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -214,14 +214,14 @@ public sealed partial class DocumentViewModel
             {
                 try { File.Delete(dlg.FileName); } catch (IOException) { }
                 SearchStatus = "El archivo ya estaba optimizado";
-                MessageBox.Show(
+                Msg.Show(
                     $"No se pudo reducir: la copia no es más pequeña ({Dialogs.FormatSize(result.NewBytes)} frente a {Dialogs.FormatSize(result.OriginalBytes)}).\n\nEl archivo ya está bien comprimido. No se guardó ninguna copia.",
                     "Reducir tamaño", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             SearchStatus = $"Reducido de {Dialogs.FormatSize(result.OriginalBytes)} a {Dialogs.FormatSize(result.NewBytes)}";
-            var answer = MessageBox.Show(
+            var answer = Msg.Show(
                 $"Tamaño: {Dialogs.FormatSize(result.OriginalBytes)} → {Dialogs.FormatSize(result.NewBytes)} (−{result.SavedFraction:P0}).\n\nGuardado en:\n{dlg.FileName}\n\n¿Abrir la copia reducida?",
                 "Reducir tamaño", MessageBoxButton.YesNo, MessageBoxImage.Information);
             if (answer == MessageBoxResult.Yes && Application.Current.MainWindow?.DataContext is MainViewModel main) main.OpenPath(dlg.FileName);

@@ -54,6 +54,7 @@ public partial class App : Application
         var toOpen = e.Args.Where(a => a.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(a)).ToList();
         if (toOpen.Count == 0) vm.RestorePreviousSession();
         foreach (var arg in toOpen) vm.OpenPath(arg);
+        _ = vm.CheckUpdatesQuietlyAsync();
     }
 
     private readonly CancellationTokenSource _stop = new();
@@ -79,7 +80,7 @@ public partial class App : Application
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         Log.Error(e.Exception, "Error no controlado");
-        MessageBox.Show(e.Exception.Message, "DOCS-DR — Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        Msg.Show(e.Exception.Message, "DOCS-DR — Error", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }
 

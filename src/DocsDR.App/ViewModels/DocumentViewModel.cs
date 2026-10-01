@@ -323,7 +323,7 @@ public sealed partial class DocumentViewModel : ObservableObject, IDisposable
                 try { ed.RestoreSnapshot(snapshot); } catch (Exception rex) { Serilog.Log.Error(rex, "No se pudo restaurar"); }
                 AfterStructuralChange();
             }
-            MessageBox.Show(ex.Message, "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Msg.Show(ex.Message, "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
 
@@ -416,7 +416,7 @@ public sealed partial class DocumentViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show($"No se pudo guardar el archivo (¿está abierto en otro programa o es de solo lectura?).\n{ex.Message}",
+            Msg.Show($"No se pudo guardar el archivo (¿está abierto en otro programa o es de solo lectura?).\n{ex.Message}",
                 "Guardar", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
@@ -494,7 +494,7 @@ public sealed partial class DocumentViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"No se pudo leer la imagen:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Msg.Show($"No se pudo leer la imagen:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
     }
@@ -718,10 +718,10 @@ public sealed partial class DocumentViewModel : ObservableObject, IDisposable
         var pages = TargetPages;
         if (pages.Count >= Pages.Count)
         {
-            MessageBox.Show("No se pueden eliminar todas las páginas del documento.", "Eliminar páginas", MessageBoxButton.OK, MessageBoxImage.Information);
+            Msg.Show("No se pueden eliminar todas las páginas del documento.", "Eliminar páginas", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (MessageBox.Show($"¿Eliminar {PagesLabel(pages)}? Podrás deshacerlo con Ctrl+Z.", "Eliminar páginas",
+        if (Msg.Show($"¿Eliminar {PagesLabel(pages)}? Podrás deshacerlo con Ctrl+Z.", "Eliminar páginas",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
         Edit(ed => ed.DeletePages(pages), structural: true);
@@ -800,7 +800,7 @@ public sealed partial class DocumentViewModel : ObservableObject, IDisposable
             for (int i = 0; i < groups.Count; i++)
                 ed.ExtractPages(groups[i], Path.Combine(dlg.FolderName, $"{name}_{i + 1}.pdf"));
             SearchStatus = $"Se crearon {groups.Count} archivo(s)";
-            MessageBox.Show($"Se crearon {groups.Count} archivo(s) en:\n{dlg.FolderName}", "Dividir documento", MessageBoxButton.OK, MessageBoxImage.Information);
+            Msg.Show($"Se crearon {groups.Count} archivo(s) en:\n{dlg.FolderName}", "Dividir documento", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) { ShowError("No se pudo dividir", ex); }
     }
@@ -808,7 +808,7 @@ public sealed partial class DocumentViewModel : ObservableObject, IDisposable
     private static void ShowError(string message, Exception ex)
     {
         Serilog.Log.Error(ex, message);
-        MessageBox.Show($"{message}:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
+        Msg.Show($"{message}:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     public void Dispose() => Document.Dispose();

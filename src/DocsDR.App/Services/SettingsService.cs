@@ -13,7 +13,7 @@ public sealed record WindowPlacement(double Left, double Top, double Width, doub
 public sealed class SettingsService
 {
     private const int MaxRecent = 10;
-    private static readonly string FilePath = Path.Combine(App.DataFolder, "settings.json");
+    private readonly string _filePath;
 
     public List<string> RecentFiles { get; private set; } = [];
 
@@ -21,7 +21,7 @@ public sealed class SettingsService
     public string Theme { get; private set; } = "Dark";
 
     /// <summary>¿Reabrir al iniciar los documentos que estaban abiertos al cerrar?</summary>
-    public bool RestoreSession { get; private set; } = true;
+    public bool RestoreSession { get; private set; } = false;
 
     public List<SessionEntry> Session { get; private set; } = [];
     public int SessionSelected { get; private set; }
@@ -30,20 +30,26 @@ public sealed class SettingsService
     /// <summary>Ancho del panel lateral de miniaturas (null = el predeterminado).</summary>
     public double? SidePanelWidth { get; private set; }
 
-    public SettingsService()
+    /// <summary>Fecha (aaaa-mm-dd) de la última comprobación automática de actualizaciones, o null si nunca se hizo.</summary>
+    public string? LastUpdateCheck { get; private set; }
+
+    /// <param name="filePath">Archivo de configuración; null = el de %AppData%\DocsDR (las pruebas pasan uno temporal).</param>
+    public SettingsService(string? filePath = null)
     {
+        _filePath = filePath ?? Path.Combine(App.DataFolder, "settings.json");
         try
         {
-            if (File.Exists(FilePath))
+            if (File.Exists(_filePath))
             {
-                var data = JsonSerializer.Deserialize<Data>(File.ReadAllText(FilePath));
+                var data = JsonSerializer.Deserialize<Data>(File.ReadAllText(_filePath));
                 RecentFiles = data?.RecentFiles ?? [];
                 Theme = data?.Theme == "Light" ? "Light" : "Dark";
-                RestoreSession = data?.RestoreSession ?? true;
+                RestoreSession = data?.RestoreSession ?? false;
                 Session = data?.Session ?? [];
                 SessionSelected = data?.SessionSelected ?? 0;
                 Window = data?.Window;
                 SidePanelWidth = data?.SidePanelWidth;
+                LastUpdateCheck = data?.LastUpdateCheck;
             }
         }
         catch (Exception ex)
@@ -72,6 +78,12 @@ public sealed class SettingsService
         Save();
     }
 
+    public void SetLastUpdateCheck(string date)
+    {
+        LastUpdateCheck = date;
+        Save();
+    }
+
     /// <summary>Guarda cómo quedó la ventana y qué documentos había abiertos.</summary>
     public void SaveView(WindowPlacement window, IReadOnlyList<SessionEntry> session, int selected, double? sidePanelWidth)
     {
@@ -86,10 +98,11 @@ public sealed class SettingsService
     {
         try
         {
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(new Data
+            File.WriteAllText(_filePath, JsonSerializer.Serialize(new Data
             {
                 RecentFiles = RecentFiles, Theme = Theme, RestoreSession = RestoreSession,
                 Session = Session, SessionSelected = SessionSelected, Window = Window, SidePanelWidth = SidePanelWidth,
+                LastUpdateCheck = LastUpdateCheck,
             }));
         }
         catch (Exception ex)
@@ -102,10 +115,11 @@ public sealed class SettingsService
     {
         public List<string> RecentFiles { get; set; } = [];
         public string Theme { get; set; } = "Dark";
-        public bool RestoreSession { get; set; } = true;
+        public bool RestoreSession { get; set; } = false;
         public List<SessionEntry> Session { get; set; } = [];
         public int SessionSelected { get; set; }
         public WindowPlacement? Window { get; set; }
         public double? SidePanelWidth { get; set; }
+        public string? LastUpdateCheck { get; set; }
     }
 }

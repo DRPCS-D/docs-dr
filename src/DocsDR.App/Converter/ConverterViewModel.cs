@@ -229,7 +229,7 @@ public sealed partial class ConverterViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRun))]
     private async Task DetectAllAsync()
     {
-        if (_defs.Count > 0 && MessageBox.Show("Se reemplazarán todas las tablas definidas. ¿Continuar?", "Detectar tablas",
+        if (_defs.Count > 0 && Msg.Show("Se reemplazarán todas las tablas definidas. ¿Continuar?", "Detectar tablas",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
@@ -509,7 +509,7 @@ public sealed partial class ConverterViewModel : ObservableObject
         }
         catch (IOException ex)
         {
-            MessageBox.Show($"No se pudo guardar el archivo (¿está abierto en Excel?).\n{ex.Message}", "Exportar",
+            Msg.Show($"No se pudo guardar el archivo (¿está abierto en Excel?).\n{ex.Message}", "Exportar",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -531,7 +531,7 @@ public sealed partial class ConverterViewModel : ObservableObject
         }
         catch (IOException ex)
         {
-            MessageBox.Show($"No se pudo guardar el archivo.\n{ex.Message}", "Exportar", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Msg.Show($"No se pudo guardar el archivo.\n{ex.Message}", "Exportar", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -539,7 +539,7 @@ public sealed partial class ConverterViewModel : ObservableObject
     {
         CurrentStep = 4;
         Status = fileCount == 1 ? $"Exportado: {path}" : $"Exportados {fileCount} archivos en {Path.GetDirectoryName(path)}";
-        if (MessageBox.Show("Exportación completada. ¿Abrir el archivo?", "Exportar", MessageBoxButton.YesNo,
+        if (Msg.Show("Exportación completada. ¿Abrir el archivo?", "Exportar", MessageBoxButton.YesNo,
                 MessageBoxImage.Information) == MessageBoxResult.Yes)
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }

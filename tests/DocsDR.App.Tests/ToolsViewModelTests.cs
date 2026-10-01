@@ -98,30 +98,26 @@ public class ToolsViewModelTests : IDisposable
     [Fact]
     public void Settings_remember_the_session_the_window_and_the_restore_option()
     {
-        var file = Path.Combine(App.DataFolder, "settings.json");
-        Directory.CreateDirectory(App.DataFolder);
-        var backup = File.Exists(file) ? File.ReadAllText(file) : null;
+        var file = Path.Combine(Path.GetTempPath(), $"docsdr-test-{Guid.NewGuid():N}.json");
         try
         {
-            File.Delete(file);
-            var s = new SettingsService();
-            Assert.True(s.RestoreSession);
+            var s = new SettingsService(file);
+            Assert.False(s.RestoreSession);
             Assert.Empty(s.Session);
+            Assert.Null(s.LastUpdateCheck);
 
-            s.SaveView(new WindowPlacement(100, 50, 1200, 800, true), [new SessionEntry(@"C:\a.pdf", 4, 1.5), new SessionEntry(@"C:\b.pdf", 0, 1.0)], 1, null);
-            s.SetRestoreSession(false);
+            s.SaveView(new WindowPlacement(100, 50, 1200, 800, true), [new SessionEntry(@"C:.pdf", 4, 1.5), new SessionEntry(@"C:.pdf", 0, 1.0)], 1, null);
+            s.SetRestoreSession(true);
+            s.SetLastUpdateCheck("2026-10-01");
 
-            var again = new SettingsService();
-            Assert.False(again.RestoreSession);
+            var again = new SettingsService(file);
+            Assert.True(again.RestoreSession);
             Assert.Equal(2, again.Session.Count);
-            Assert.Equal(new SessionEntry(@"C:\a.pdf", 4, 1.5), again.Session[0]);
+            Assert.Equal(new SessionEntry(@"C:.pdf", 4, 1.5), again.Session[0]);
             Assert.Equal(1, again.SessionSelected);
             Assert.Equal(new WindowPlacement(100, 50, 1200, 800, true), again.Window);
+            Assert.Equal("2026-10-01", again.LastUpdateCheck);
         }
-        finally
-        {
-            if (backup is null) File.Delete(file);
-            else File.WriteAllText(file, backup);
-        }
+        finally { File.Delete(file); }
     }
 }

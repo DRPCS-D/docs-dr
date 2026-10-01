@@ -373,7 +373,7 @@ public sealed partial class DocumentViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"No se pudo leer la imagen:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Msg.Show($"No se pudo leer la imagen:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
             return null;
         }
     }

@@ -40,14 +40,14 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
     {
         if (DefaultReader.InstalledExePath() is not { } exe)
         {
-            MessageBox.Show("Esta opción está disponible en la versión instalada de DOCS-DR (no en la portable ni en compilaciones de prueba).",
+            Msg.Show("Esta opción está disponible en la versión instalada de DOCS-DR (no en la portable ni en compilaciones de prueba).",
                 "Lector de PDF predeterminado", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         try { DefaultReader.Register(exe); }
         catch (Exception ex) { Serilog.Log.Warning(ex, "No se pudo registrar DOCS-DR para abrir PDF"); }
 
-        var answer = MessageBox.Show(
+        var answer = Msg.Show(
             "Windows no permite que una aplicación se ponga como predeterminada por sí sola: lo eliges tú.\n\n" +
             "Se abrirá «Aplicaciones predeterminadas». Elige DOCS-DR en la lista y pulsa «Establecer como predeterminada» " +
             "(o busca «.pdf» y selecciona DOCS-DR).",
@@ -81,7 +81,7 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
         if (existing is not null) { SelectedDocument = existing; return existing; }
         if (!File.Exists(path))
         {
-            if (interactive) MessageBox.Show($"No se encontró el archivo:\n{path}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (interactive) Msg.Show($"No se encontró el archivo:\n{path}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
             return null;
         }
 
@@ -98,14 +98,14 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
             try { doc = pdfService.Open(path, pwd); }
             catch (PdfPasswordRequiredException)
             {
-                MessageBox.Show("Contraseña incorrecta.", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Msg.Show("Contraseña incorrecta.", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return null;
             }
         }
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "No se pudo abrir {Path}", path);
-            if (interactive) MessageBox.Show($"No se pudo abrir el archivo:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (interactive) Msg.Show($"No se pudo abrir el archivo:\n{ex.Message}", "DOCS-DR", MessageBoxButton.OK, MessageBoxImage.Error);
             return null;
         }
 
@@ -133,7 +133,7 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
     {
         if (!doc.IsModified) return true;
         SelectedDocument = doc;
-        var answer = MessageBox.Show($"¿Guardar los cambios en «{doc.Title}»?", "DOCS-DR",
+        var answer = Msg.Show($"¿Guardar los cambios en «{doc.Title}»?", "DOCS-DR",
             MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         return answer switch
         {
@@ -179,13 +179,13 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
         }
         catch (PdfPasswordRequiredException ex)
         {
-            MessageBox.Show($"Uno de los archivos está protegido con contraseña y no se puede unir:\n{ex.Message}", "Unir PDFs",
+            Msg.Show($"Uno de los archivos está protegido con contraseña y no se puede unir:\n{ex.Message}", "Unir PDFs",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show($"No se pudo guardar el archivo:\n{ex.Message}", "Unir PDFs", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Msg.Show($"No se pudo guardar el archivo:\n{ex.Message}", "Unir PDFs", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         OpenPath(dlg.FileName);
@@ -240,7 +240,7 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
         catch (Exception ex)
         {
             Serilog.Log.Warning(ex, "No se pudo crear el PDF desde imágenes");
-            MessageBox.Show($"No se pudo crear el PDF (¿alguna imagen está dañada o no es compatible?):\n{ex.Message}", "Crear PDF desde imágenes",
+            Msg.Show($"No se pudo crear el PDF (¿alguna imagen está dañada o no es compatible?):\n{ex.Message}", "Crear PDF desde imágenes",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -298,13 +298,35 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
     [RelayCommand]
     private void OpenRepository() => AppInfo.OpenUrl(AppInfo.RepositoryUrl);
 
+    /// <summary>
+    /// Una vez al día (en el primer arranque), busca en segundo plano si hay una versión nueva y lo avisa
+    /// solo en la barra de estado, sin ventanas. Si falla (sin internet), calla y se reintenta en el próximo arranque.
+    /// </summary>
+    public async Task CheckUpdatesQuietlyAsync()
+    {
+        var today = DateTime.Now.ToString("yyyy-MM-dd");
+        if (!updates.IsInstalled || settings.LastUpdateCheck == today) return;
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(4)); // que el arranque termine primero
+            var update = await updates.CheckAsync();
+            settings.SetLastUpdateCheck(today);
+            if (update is not null)
+                StatusText = $"Hay una versión nueva de DOCS-DR ({UpdateService.VersionOf(update)}). Instálala desde Ayuda › Buscar actualizaciones";
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Information(ex, "No se pudo comprobar las actualizaciones en segundo plano");
+        }
+    }
+
     [RelayCommand]
     private async Task CheckUpdatesAsync()
     {
         if (!updates.IsInstalled)
         {
             // Copia sin instalar (código fuente o carpeta copiada): no puede actualizarse sola.
-            if (MessageBox.Show(
+            if (Msg.Show(
                     "Esta copia de DOCS-DR no fue instalada con el instalador, por eso no puede actualizarse sola.\n\n" +
                     "¿Abrir la página de descargas para ver la última versión?",
                     "Buscar actualizaciones", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
@@ -319,13 +341,13 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
             if (update is null)
             {
                 StatusText = "DOCS-DR está actualizado";
-                MessageBox.Show($"Ya tienes la última versión ({AppInfo.Version}).", "Buscar actualizaciones",
+                Msg.Show($"Ya tienes la última versión ({AppInfo.Version}).", "Buscar actualizaciones",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             var version = UpdateService.VersionOf(update);
-            if (MessageBox.Show(
+            if (Msg.Show(
                     $"Hay una versión nueva: {version} (tienes la {AppInfo.Version}).\n\n" +
                     "Se descargará, se cerrará DOCS-DR y se volverá a abrir ya actualizado. ¿Continuar?",
                     "Buscar actualizaciones", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
@@ -345,7 +367,7 @@ public sealed partial class MainViewModel(IPdfService pdfService, SettingsServic
         {
             Serilog.Log.Warning(ex, "No se pudo buscar o instalar la actualización");
             StatusText = "No se pudo comprobar si hay actualizaciones";
-            MessageBox.Show($"No se pudo comprobar o instalar la actualización. Revisa tu conexión a internet e inténtalo de nuevo.\n\n{ex.Message}",
+            Msg.Show($"No se pudo comprobar o instalar la actualización. Revisa tu conexión a internet e inténtalo de nuevo.\n\n{ex.Message}",
                 "Buscar actualizaciones", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }

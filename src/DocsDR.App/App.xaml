@@ -6,6 +6,7 @@
     <Application.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+        <local:FileNameConverter x:Key="FileName" />
         <SolidColorBrush x:Key="ViewerBackground" Color="#FF6B7079" />
         <SolidColorBrush x:Key="HighlightBrush" Color="#66FFD400" />
         <SolidColorBrush x:Key="SelectionBrush" Color="#661E6FD9" />

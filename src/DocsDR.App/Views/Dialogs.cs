@@ -143,7 +143,7 @@ public static partial class Dialogs
         {
             if (list.Items.Count < minCount)
             {
-                MessageBox.Show(window, minCount == 1 ? "Agrega al menos un archivo." : $"Agrega al menos {minCount} archivos.", title);
+                Msg.Show(window, minCount == 1 ? "Agrega al menos un archivo." : $"Agrega al menos {minCount} archivos.", title);
                 return;
             }
             window.DialogResult = true;

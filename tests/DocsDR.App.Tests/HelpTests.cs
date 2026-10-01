@@ -34,22 +34,15 @@ public class HelpTests
     [Fact]
     public void Theme_is_dark_by_default_and_the_choice_is_remembered()
     {
-        var settingsFile = System.IO.Path.Combine(DocsDR.App.App.DataFolder, "settings.json");
-        System.IO.Directory.CreateDirectory(DocsDR.App.App.DataFolder);
-        var backup = System.IO.File.Exists(settingsFile) ? System.IO.File.ReadAllText(settingsFile) : null;
+        var file = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"docsdr-test-{Guid.NewGuid():N}.json");
         try
         {
-            System.IO.File.Delete(settingsFile);
-            var settings = new DocsDR.App.Services.SettingsService();
+            var settings = new DocsDR.App.Services.SettingsService(file);
             Assert.Equal("Dark", settings.Theme);
 
             settings.SetTheme("Light");
-            Assert.Equal("Light", new DocsDR.App.Services.SettingsService().Theme);
+            Assert.Equal("Light", new DocsDR.App.Services.SettingsService(file).Theme);
         }
-        finally
-        {
-            if (backup is null) System.IO.File.Delete(settingsFile);
-            else System.IO.File.WriteAllText(settingsFile, backup);
-        }
+        finally { System.IO.File.Delete(file); }
     }
 }
